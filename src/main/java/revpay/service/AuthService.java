@@ -16,6 +16,10 @@ public class AuthService {
 
     private UserDao userDao = new UserDaoImpl();
     private WalletDao walletDao = new WalletDaoImpl();
+
+    private PasswordRecoveryService recoveryService = new PasswordRecoveryService();
+    private BusinessProfileService businessProfileService = new BusinessProfileService();
+
     private Scanner sc;
 
     public AuthService(Scanner sc) {
@@ -23,10 +27,11 @@ public class AuthService {
     }
 
     // =======================
-    //   REGISTRATION
+    // REGISTRATION
     // =======================
     public User register() {
         ConsoleUtil.printHeader("Registration");
+
         System.out.println("Select account type:");
         System.out.println("1. Personal Account");
         System.out.println("2. Business Account");
@@ -34,12 +39,11 @@ public class AuthService {
         String choice = sc.nextLine();
 
         String accountType;
-        if ("1".equals(choice)) {
-            accountType = "PERSONAL";
-        } else if ("2".equals(choice)) {
-            accountType = "BUSINESS";
-        } else {
+        if ("1".equals(choice)) accountType = "PERSONAL";
+        else if ("2".equals(choice)) accountType = "BUSINESS";
+        else {
             System.out.println("[ERROR] Invalid choice.");
+            ConsoleUtil.pause(sc);
             return null;
         }
 
@@ -51,41 +55,52 @@ public class AuthService {
         String fullName = sc.nextLine();
         if (!ValidationUtil.isNonEmpty(fullName)) {
             System.out.println("[ERROR] Full name cannot be empty.");
+            ConsoleUtil.pause(sc);
             return null;
         }
         user.setFullName(fullName.trim());
 
-        // Username
+        // Username (unique)
         System.out.print("Username  : ");
         String username = sc.nextLine();
         if (!ValidationUtil.isNonEmpty(username)) {
             System.out.println("[ERROR] Username cannot be empty.");
+            ConsoleUtil.pause(sc);
+            return null;
+        }
+        if (userDao.findByUsername(username.trim()) != null) {
+            System.out.println("[ERROR] Username already taken.");
+            ConsoleUtil.pause(sc);
             return null;
         }
         user.setUsername(username.trim());
 
-        // Email
+        // Email (unique)
         System.out.print("Email     : ");
         String email = sc.nextLine();
         if (!ValidationUtil.isValidEmail(email)) {
             System.out.println("[ERROR] Invalid email format.");
+            ConsoleUtil.pause(sc);
             return null;
         }
-        if (userDao.findByEmail(email) != null) {
-            System.out.println("[ERROR] Email is already registered.");
+        if (userDao.findByEmail(email.trim()) != null) {
+            System.out.println("[ERROR] Email already registered.");
+            ConsoleUtil.pause(sc);
             return null;
         }
         user.setEmail(email.trim());
 
-        // Phone
+        // Phone (unique)
         System.out.print("Phone     : ");
         String phone = sc.nextLine();
         if (!ValidationUtil.isValidPhone(phone)) {
             System.out.println("[ERROR] Phone must be exactly 10 digits.");
+            ConsoleUtil.pause(sc);
             return null;
         }
-        if (userDao.findByPhone(phone) != null) {
-            System.out.println("[ERROR] Phone number is already registered.");
+        if (userDao.findByPhone(phone.trim()) != null) {
+            System.out.println("[ERROR] Phone already registered.");
+            ConsoleUtil.pause(sc);
             return null;
         }
         user.setPhone(phone.trim());
@@ -98,15 +113,12 @@ public class AuthService {
 
         if (!pw1.equals(pw2)) {
             System.out.println("[ERROR] Passwords do not match.");
+            ConsoleUtil.pause(sc);
             return null;
         }
         if (!ValidationUtil.isValidPassword(pw1)) {
-            System.out.println("[ERROR] Weak password.");
-            System.out.println("        Must be at least 8 chars and contain:");
-            System.out.println("        - Uppercase letter");
-            System.out.println("        - Lowercase letter");
-            System.out.println("        - Digit");
-            System.out.println("        - Special char (@$!%*?&_).");
+            System.out.println("[ERROR] Weak password. Must contain uppercase, lowercase, digit, special char and min 8 chars.");
+            ConsoleUtil.pause(sc);
             return null;
         }
         user.setPasswordHash(HashUtil.hash(pw1));
@@ -116,11 +128,12 @@ public class AuthService {
         String pin = sc.nextLine();
         if (!ValidationUtil.isValidTxnPin(pin)) {
             System.out.println("[ERROR] PIN must be exactly 4 digits (0-9).");
+            ConsoleUtil.pause(sc);
             return null;
         }
         user.setTxnPinHash(HashUtil.hash(pin));
 
-        // Generate unique ACCOUNT_ID (P-xxxxx / B-xxxxx)
+        // Generate ACCOUNT_ID
         String prefix = "PERSONAL".equals(accountType) ? "P-" : "B-";
         String accountId = null;
         int attempts = 0;
@@ -128,29 +141,43 @@ public class AuthService {
             long temp = System.currentTimeMillis() % 1000000;
             accountId = prefix + (100000 + temp);
             attempts++;
-        } while (userDao.findByAccountId(accountId) != null && attempts < 5);
+        } while (userDao.findByAccountId(accountId) != null && attempts < 10);
 
         user.setAccountId(accountId);
 
         long newId = userDao.createUser(user);
         if (newId <= 0) {
             System.out.println("[ERROR] Failed to create user.");
+            ConsoleUtil.pause(sc);
             return null;
         }
 
-        // Create wallet for user
+        // Create wallet row
         walletDao.createWalletForUser(newId);
+
+        // If BUSINESS -> insert business profile details
+        if ("BUSINESS".equals(accountType)) {
+            boolean ok = businessProfileService.collectAndSave(sc, newId);
+            if (!ok) {
+                System.out.println("[WARN] Business profile was not saved properly. (But account is created)");
+            }
+        }
+
+        // Setup Security Questions
+        recoveryService.setupSecurityQuestions(sc, newId);
 
         System.out.println("[INFO] " + accountType + " account created successfully.");
         System.out.println("[INFO] Your Account ID: " + user.getAccountId());
+        ConsoleUtil.pause(sc);
         return user;
     }
 
     // =======================
-    //        LOGIN
+    // LOGIN
     // =======================
     public User login() {
         ConsoleUtil.printHeader("Login");
+
         System.out.println("Login using:");
         System.out.println("1. Email");
         System.out.println("2. Phone");
@@ -164,6 +191,7 @@ public class AuthService {
             String email = sc.nextLine();
             if (!ValidationUtil.isValidEmail(email)) {
                 System.out.println("[ERROR] Invalid email format.");
+                ConsoleUtil.pause(sc);
                 return null;
             }
             user = userDao.findByEmail(email.trim());
@@ -173,22 +201,26 @@ public class AuthService {
             String phone = sc.nextLine();
             if (!ValidationUtil.isValidPhone(phone)) {
                 System.out.println("[ERROR] Phone must be exactly 10 digits.");
+                ConsoleUtil.pause(sc);
                 return null;
             }
             user = userDao.findByPhone(phone.trim());
 
         } else {
             System.out.println("[ERROR] Invalid choice.");
+            ConsoleUtil.pause(sc);
             return null;
         }
 
         if (user == null) {
             System.out.println("[ERROR] User not found.");
+            ConsoleUtil.pause(sc);
             return null;
         }
 
         if ("LOCKED".equalsIgnoreCase(user.getStatus())) {
-            System.out.println("[ERROR] Account locked due to too many failed attempts.");
+            System.out.println("[ERROR] Account locked due to failed attempts.");
+            ConsoleUtil.pause(sc);
             return null;
         }
 
@@ -198,16 +230,18 @@ public class AuthService {
         if (!HashUtil.check(pw, user.getPasswordHash())) {
             int newAttempts = user.getFailedLoginAttempts() + 1;
             userDao.updateFailedAttempts(user.getUserId(), newAttempts);
+
             if (newAttempts >= 3) {
                 userDao.updateStatus(user.getUserId(), "LOCKED");
                 System.out.println("[ERROR] Too many failed attempts. Account locked.");
             } else {
                 System.out.println("[ERROR] Incorrect password. Attempts: " + newAttempts);
             }
+            ConsoleUtil.pause(sc);
             return null;
         }
 
-        // Reset failed attempts after successful password check
+        // Reset attempts
         userDao.updateFailedAttempts(user.getUserId(), 0);
 
         // Simulated 2FA
@@ -217,11 +251,19 @@ public class AuthService {
         String entered = sc.nextLine();
         if (!code.equals(entered)) {
             System.out.println("[ERROR] Wrong security code.");
+            ConsoleUtil.pause(sc);
             return null;
         }
 
         System.out.println("[INFO] Login successful.");
-        System.out.println("Welcome, " + user.getFullName() + " (" + user.getAccountType() + " Account)");
+        ConsoleUtil.pause(sc);
         return user;
+    }
+
+    // =======================
+    // FORGOT PASSWORD
+    // =======================
+    public void forgotPassword() {
+        recoveryService.forgotPassword(sc);
     }
 }

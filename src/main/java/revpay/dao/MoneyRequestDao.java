@@ -1,18 +1,19 @@
 package revpay.dao;
 
 import java.util.List;
-
 import revpay.model.MoneyRequest;
 
 public interface MoneyRequestDao {
 
     long createRequest(MoneyRequest req);
 
-    java.util.List<MoneyRequest> findIncoming(long userId);
+    List<MoneyRequest> findIncoming(long userId);
 
-    java.util.List<MoneyRequest> findOutgoing(long userId);
+    
+    List<MoneyRequest> findOutgoing(long userId);
+
+    
+    boolean updateStatus(long requestId, String status);
 
     MoneyRequest findById(long requestId);
-
-    void updateStatus(long requestId, String newStatus);
 }

@@ -68,4 +68,20 @@ public class Transaction {
     public void setCreatedAt(Date createdAt) {
         this.createdAt = createdAt;
     }
+    private String refId;  // optional reference id
+
+    public String getRefId() {
+        return refId;
+    }
+    public void setRefId(String refId) {
+        this.refId = refId;
+    }
+
+    // Backward-compatible aliases used by some DAO/Export code
+    public long getTxnId() {
+        return getTransactionId();
+    }
+    public void setTxnId(long txnId) {
+        setTransactionId(txnId);
+    }
 }

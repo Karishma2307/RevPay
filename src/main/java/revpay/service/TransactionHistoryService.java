@@ -1,8 +1,6 @@
 package revpay.service;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
@@ -12,238 +10,102 @@ import revpay.dao.impl.TransactionDaoImpl;
 import revpay.model.Transaction;
 import revpay.model.User;
 import revpay.util.ConsoleUtil;
+import revpay.util.ExportUtil;
 
 public class TransactionHistoryService {
 
-    private TransactionDao transactionDao = new TransactionDaoImpl();
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private TransactionDao dao = new TransactionDaoImpl();
 
-    public void showHistory(Scanner sc, User user) {
-        while (true) {
-            ConsoleUtil.printHeader("Transaction History");
-            System.out.println("1. View All Transactions");
-            System.out.println("2. Filter by Type (TRANSFER / WALLET_TOPUP / WALLET_WITHDRAW)");
-            System.out.println("3. Filter by Direction (Sent / Received)");
-            System.out.println("4. Filter by Amount Range");
-            System.out.println("5. Filter by Date Range (yyyy-MM-dd)");
-            System.out.println("6. Back");
-            System.out.print("Choice: ");
-            String choice = sc.nextLine();
+    public void showFilteredHistory(Scanner sc, User user) {
+        ConsoleUtil.printHeader("Transaction History - Filter/Search/Export");
 
-            // load all transactions once each time we open history
-            List<Transaction> all = transactionDao.findByUserId(user.getUserId());
+        System.out.print("Filter TYPE (SEND/RECEIVE/TOPUP/WITHDRAW/INVOICE/LOAN) or blank: ");
+        String type = blankToNull(sc.nextLine());
 
-            if ("1".equals(choice)) {
-                printTransactions(all, user);
-                ConsoleUtil.pause(sc);
+        System.out.print("Filter STATUS (SUCCESS/PENDING/FAILED) or blank: ");
+        String status = blankToNull(sc.nextLine());
 
-            } else if ("2".equals(choice)) {
-                filterByType(sc, all, user);
+        Date from = null;
+        Date to = null;
 
-            } else if ("3".equals(choice)) {
-                filterByDirection(sc, all, user);
+        System.out.print("From Date (yyyy-MM-dd) or blank: ");
+        String fromStr = sc.nextLine().trim();
+        if (fromStr.length() > 0) from = parseDate(fromStr);
 
-            } else if ("4".equals(choice)) {
-                filterByAmount(sc, all, user);
+        System.out.print("To Date (yyyy-MM-dd) or blank: ");
+        String toStr = sc.nextLine().trim();
+        if (toStr.length() > 0) to = parseDate(toStr);
 
-            } else if ("5".equals(choice)) {
-                filterByDate(sc, all, user);
+        System.out.print("Min Amount or blank: ");
+        Double min = parseDoubleOrNull(sc.nextLine());
 
-            } else if ("6".equals(choice)) {
-                break;
+        System.out.print("Max Amount or blank: ");
+        Double max = parseDoubleOrNull(sc.nextLine());
 
-            } else {
-                System.out.println("[ERROR] Invalid option.");
-                ConsoleUtil.pause(sc);
-            }
-        }
-    }
+        System.out.print("Search keyword in NOTE/TYPE/STATUS or blank: ");
+        String keyword = blankToNull(sc.nextLine());
 
-    private void filterByType(Scanner sc, List<Transaction> all, User user) {
-        System.out.println("Filter by Type:");
-        System.out.println("1. TRANSFER");
-        System.out.println("2. WALLET_TOPUP");
-        System.out.println("3. WALLET_WITHDRAW");
-        System.out.print("Choice: ");
-        String ch = sc.nextLine();
+        List<Transaction> txs = dao.searchTransactions(user.getUserId(), type, status, from, to, min, max, keyword);
 
-        String type = null;
-        if ("1".equals(ch)) type = "TRANSFER";
-        else if ("2".equals(ch)) type = "WALLET_TOPUP";
-        else if ("3".equals(ch)) type = "WALLET_WITHDRAW";
-        else {
-            System.out.println("[ERROR] Invalid type option.");
+        ConsoleUtil.printHeader("Results");
+        if (txs == null || txs.isEmpty()) {
+            System.out.println("No transactions found.");
             ConsoleUtil.pause(sc);
             return;
         }
 
-        List<Transaction> filtered = new ArrayList<Transaction>();
-        for (Transaction t : all) {
-            if (t.getType() != null && t.getType().equalsIgnoreCase(type)) {
-                filtered.add(t);
-            }
+        for (Transaction t : txs) {
+            System.out.println("----------------------------------------");
+            System.out.println("TXN_ID   : " + t.getTransactionId());
+            System.out.println("TYPE     : " + t.getType());
+            System.out.println("STATUS   : " + t.getStatus());
+            System.out.println("AMOUNT   : $" + String.format("%.2f", t.getAmount()));
+            System.out.println("FROM     : " + t.getFromUserId());
+            System.out.println("TO       : " + t.getToUserId());
+            System.out.println("NOTE     : " + safe(t.getNote()));
+            System.out.println("DATE     : " + safe(t.getCreatedAt()));
         }
 
-        ConsoleUtil.printHeader("Transactions - Type: " + type);
-        printTransactions(filtered, user);
+        System.out.println("----------------------------------------");
+        System.out.print("Export these results to CSV? (y/n): ");
+        String ex = sc.nextLine().trim();
+
+        if ("y".equalsIgnoreCase(ex)) {
+            String file = ExportUtil.exportTransactionsToCsv(txs, "revpay_transactions_" + user.getUserId());
+            if (file != null) System.out.println("[INFO] Exported to: " + file);
+            else System.out.println("[ERROR] Export failed.");
+        }
+
         ConsoleUtil.pause(sc);
     }
 
-    private void filterByDirection(Scanner sc, List<Transaction> all, User user) {
-        System.out.println("Direction:");
-        System.out.println("1. Sent");
-        System.out.println("2. Received");
-        System.out.print("Choice: ");
-        String ch = sc.nextLine();
-
-        boolean sent;
-        if ("1".equals(ch)) {
-            sent = true;
-        } else if ("2".equals(ch)) {
-            sent = false;
-        } else {
-            System.out.println("[ERROR] Invalid direction option.");
-            ConsoleUtil.pause(sc);
-            return;
-        }
-
-        List<Transaction> filtered = new ArrayList<Transaction>();
-        long userId = user.getUserId();
-
-        for (Transaction t : all) {
-            boolean isSent = (t.getFromUserId() != null && t.getFromUserId().longValue() == userId);
-            boolean isReceived = (t.getToUserId() != null && t.getToUserId().longValue() == userId);
-
-            if (sent && isSent) {
-                filtered.add(t);
-            } else if (!sent && isReceived) {
-                filtered.add(t);
-            }
-        }
-
-        ConsoleUtil.printHeader("Transactions - " + (sent ? "Sent" : "Received"));
-        printTransactions(filtered, user);
-        ConsoleUtil.pause(sc);
+    private String blankToNull(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        return s.length() == 0 ? null : s;
     }
 
-    private void filterByAmount(Scanner sc, List<Transaction> all, User user) {
-        System.out.print("Minimum amount (or blank for 0): ");
-        String minStr = sc.nextLine();
-        System.out.print("Maximum amount (or blank for no limit): ");
-        String maxStr = sc.nextLine();
-
-        double min = 0.0;
-        double max = Double.MAX_VALUE;
-
+    private Date parseDate(String s) {
         try {
-            if (minStr != null && minStr.trim().length() > 0) {
-                min = Double.parseDouble(minStr.trim());
-            }
+            return new SimpleDateFormat("yyyy-MM-dd").parse(s.trim());
         } catch (Exception e) {
-            System.out.println("[ERROR] Invalid minimum amount.");
-            ConsoleUtil.pause(sc);
-            return;
+            System.out.println("[WARN] Invalid date format, ignoring.");
+            return null;
         }
+    }
 
+    private Double parseDoubleOrNull(String s) {
         try {
-            if (maxStr != null && maxStr.trim().length() > 0) {
-                max = Double.parseDouble(maxStr.trim());
-            }
+            s = s.trim();
+            if (s.length() == 0) return null;
+            return Double.valueOf(Double.parseDouble(s));
         } catch (Exception e) {
-            System.out.println("[ERROR] Invalid maximum amount.");
-            ConsoleUtil.pause(sc);
-            return;
+            System.out.println("[WARN] Invalid number, ignoring.");
+            return null;
         }
-
-        List<Transaction> filtered = new ArrayList<Transaction>();
-        for (Transaction t : all) {
-            double amt = t.getAmount();
-            if (amt >= min && amt <= max) {
-                filtered.add(t);
-            }
-        }
-
-        ConsoleUtil.printHeader("Transactions - Amount Range");
-        printTransactions(filtered, user);
-        ConsoleUtil.pause(sc);
     }
 
-    private void filterByDate(Scanner sc, List<Transaction> all, User user) {
-        System.out.print("Start date (yyyy-MM-dd): ");
-        String startStr = sc.nextLine();
-        System.out.print("End date   (yyyy-MM-dd): ");
-        String endStr = sc.nextLine();
-
-        Date start = null;
-        Date end = null;
-
-        try {
-            if (startStr != null && startStr.trim().length() > 0) {
-                start = DATE_FORMAT.parse(startStr.trim());
-            }
-            if (endStr != null && endStr.trim().length() > 0) {
-                end = DATE_FORMAT.parse(endStr.trim());
-            }
-        } catch (ParseException e) {
-            System.out.println("[ERROR] Invalid date format. Use yyyy-MM-dd.");
-            ConsoleUtil.pause(sc);
-            return;
-        }
-
-        List<Transaction> filtered = new ArrayList<Transaction>();
-        for (Transaction t : all) {
-            Date d = t.getCreatedAt();
-            if (d == null) continue;
-
-            boolean ok = true;
-            if (start != null && d.before(start)) {
-                ok = false;
-            }
-            if (end != null && d.after(end)) {
-                ok = false;
-            }
-            if (ok) {
-                filtered.add(t);
-            }
-        }
-
-        ConsoleUtil.printHeader("Transactions - Date Range");
-        printTransactions(filtered, user);
-        ConsoleUtil.pause(sc);
-    }
-
-    private void printTransactions(List<Transaction> list, User user) {
-        if (list == null || list.isEmpty()) {
-            System.out.println("No transactions found for given filters.");
-            return;
-        }
-
-        long userId = user.getUserId();
-        System.out.println("ID       | Date       | Type           | Direction | Amount   | Note");
-        System.out.println("--------------------------------------------------------------------------");
-
-        for (Transaction t : list) {
-            String direction;
-            if (t.getFromUserId() != null && t.getFromUserId().longValue() == userId) {
-                direction = "SENT";
-            } else if (t.getToUserId() != null && t.getToUserId().longValue() == userId) {
-                direction = "RECEIVED";
-            } else {
-                direction = "-";
-            }
-
-            String dateStr = "";
-            if (t.getCreatedAt() != null) {
-                dateStr = DATE_FORMAT.format(t.getCreatedAt());
-            }
-
-            System.out.printf("%-8d | %-10s | %-13s | %-9s | $%-7.2f | %s%n",
-                    t.getTransactionId(),
-                    dateStr,
-                    t.getType(),
-                    direction,
-                    t.getAmount(),
-                    t.getNote() == null ? "" : t.getNote());
-        }
+    private String safe(Object o) {
+        return o == null ? "" : String.valueOf(o);
     }
 }

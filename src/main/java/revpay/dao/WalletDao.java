@@ -6,7 +6,7 @@ public interface WalletDao {
 
     void createWalletForUser(long userId);
 
-    Wallet findByUserId(long userId);
+    Wallet getWalletByUserId(long userId);
 
-    void updateBalance(long walletId, double newBalance);
+    void updateBalance(long userId, double newBalance);
 }

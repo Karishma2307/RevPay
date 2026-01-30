@@ -8,6 +8,15 @@ public class LoanRepayment {
     private long loanId;
     private double amount;
     private Date paidAt;
+    private String status;
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
 
     public long getRepaymentId() {
         return repaymentId;

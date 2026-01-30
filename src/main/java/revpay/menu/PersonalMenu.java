@@ -3,25 +3,32 @@ package revpay.menu;
 import java.util.Scanner;
 
 import revpay.model.User;
-import revpay.model.Wallet;
+import revpay.service.MoneyRequestService;
 import revpay.service.NotificationService;
+import revpay.service.PaymentMethodService;
+import revpay.service.SecurityService;
 import revpay.service.TransactionHistoryService;
 import revpay.service.TransferService;
 import revpay.service.WalletService;
 import revpay.util.ConsoleUtil;
-import revpay.service.MoneyRequestService;
+import revpay.util.SessionManager;
 
 public class PersonalMenu {
 
-    private Scanner sc;
-    private User user;
+    private final Scanner sc;
+    private final User user;
 
-    private WalletService walletService = new WalletService();
-    private NotificationService notificationService = new NotificationService();
-    private TransferService transferService = new TransferService(notificationService);
-    private TransactionHistoryService historyService = new TransactionHistoryService();
-    private MoneyRequestService moneyRequestService = new MoneyRequestService(notificationService);
-    
+    private final WalletService walletService = new WalletService();
+    private final TransferService transferService = new TransferService();
+    private final MoneyRequestService moneyRequestService = new MoneyRequestService();
+    private final PaymentMethodService paymentMethodService = new PaymentMethodService();
+    private final TransactionHistoryService txHistoryService = new TransactionHistoryService();
+    private final NotificationService notificationService = new NotificationService();
+    private final SecurityService securityService = new SecurityService();
+
+    // ✅ Step 4: Session timeout tracker
+    private final SessionManager session = new SessionManager();
+
     public PersonalMenu(Scanner sc, User user) {
         this.sc = sc;
         this.user = user;
@@ -29,48 +36,108 @@ public class PersonalMenu {
 
     public void show() {
         while (true) {
-            Wallet wallet = walletService.getWallet(user.getUserId());
 
-            System.out.println("=========== RevPay Dashboard - Personal ===========");
-            System.out.println("User: " + user.getFullName() + "      Account ID: " + user.getAccountId());
-            if (wallet != null) {
-                System.out.printf("Wallet Balance: $%.2f      Currency: %s%n",
-                        wallet.getBalance(), wallet.getCurrency());
+            // ✅ If session expired before showing menu
+            if (session.isExpired()) {
+                ConsoleUtil.printHeader("Session Timeout");
+                System.out.println("[INFO] You were logged out due to inactivity.");
+                ConsoleUtil.pause(sc);
+                return;
             }
-            System.out.println("---------------------------------------------------");
-            System.out.println("1. Send Money");
-            System.out.println("2. Request Money (TODO)");
-            System.out.println("3. Manage Money Requests (TODO)");
-            System.out.println("4. Wallet: Add Money");
+
+            ConsoleUtil.printHeader("RevPay Dashboard - Personal");
+            System.out.println("1. Wallet");
+            System.out.println("2. Send Money");
+            System.out.println("3. Request Money");
+            System.out.println("4. Manage Payment Methods");
             System.out.println("5. Transaction History");
             System.out.println("6. Notifications");
-            System.out.println("7. Security & Settings (TODO)");
+            System.out.println("7. Security Settings");
             System.out.println("8. Logout");
-            System.out.println("---------------------------------------------------");
             System.out.print("Choose an option: ");
+
             String choice = sc.nextLine();
 
-            if ("1".equals(choice)) {
-                transferService.sendMoney(sc, user);
-            } else if ("2".equals(choice)) {
-                moneyRequestService.createRequest(sc, user);
-            } else if ("3".equals(choice)) {
-                moneyRequestService.manageRequests(sc, user);
-            } else if ("4".equals(choice)) {
-                walletService.addMoney(sc, wallet, notificationService);
-            } else if ("5".equals(choice)) {
-                historyService.showHistory(sc, user);
-            } else if ("6".equals(choice)) {
-                notificationService.showNotifications(sc, user.getUserId());
-            } else if ("7".equals(choice)) {
-                System.out.println("[TODO] Security & Settings.");
-                ConsoleUtil.pause(sc);
-            } else if ("8".equals(choice)) {
-                System.out.println("Logging out...");
-                break;
-            } else {
-                System.out.println("[ERROR] Invalid option.");
-                ConsoleUtil.pause(sc);
+            // ✅ user performed activity
+            session.touch();
+
+            switch (choice) {
+
+                case "1":
+                    walletService.addMoneyFromCard(sc, user);
+                    session.touch();
+                    break;
+
+                case "2":
+                    transferService.sendMoney(sc, user);
+                    session.touch();
+                    break;
+
+                case "3":
+                    ConsoleUtil.printHeader("Money Requests");
+                    System.out.println("1. Create Request");
+                    System.out.println("2. View Incoming");
+                    System.out.println("3. View Outgoing");
+                    System.out.println("4. Accept Request");
+                    System.out.println("5. Decline Request");
+                    System.out.println("6. Cancel Outgoing Request");
+                    System.out.println("7. Back");
+                    System.out.print("Choice: ");
+
+                    String ch = sc.nextLine();
+                    session.touch();
+
+                    switch (ch) {
+                        case "1": moneyRequestService.createRequest(sc, user); break;
+                        case "2": moneyRequestService.viewIncoming(sc, user); break;
+                        case "3": moneyRequestService.viewOutgoing(sc, user); break;
+                        case "4": moneyRequestService.acceptRequest(sc, user); break;
+                        case "5": moneyRequestService.declineRequest(sc, user); break;
+                        case "6": moneyRequestService.cancelRequest(sc, user); break;
+                        default: break;
+                    }
+                    session.touch();
+                    break;
+
+                case "4":
+                    paymentMethodService.manage(sc, user.getUserId());
+                    session.touch();
+                    break;
+
+                case "5":
+                    txHistoryService.showFilteredHistory(sc, user);
+                    session.touch();
+                    break;
+
+                case "6":
+                    notificationService.showNotificationsMenu(sc, user.getUserId());
+                    session.touch();
+                    break;
+
+                case "7":
+                    ConsoleUtil.printHeader("Security Settings");
+                    System.out.println("1. Change Password");
+                    System.out.println("2. Change Transaction PIN");
+                    System.out.println("3. Back");
+                    System.out.print("Choice: ");
+
+                    String sec = sc.nextLine();
+                    session.touch();
+
+                    if ("1".equals(sec)) securityService.changePassword(sc, user);
+                    else if ("2".equals(sec)) securityService.changeTxnPin(sc, user);
+
+                    session.touch();
+                    break;
+
+                case "8":
+                    System.out.println("Logged out.");
+                    ConsoleUtil.pause(sc);
+                    return;
+
+                default:
+                    System.out.println("Invalid option.");
+                    ConsoleUtil.pause(sc);
             }
         }
     }

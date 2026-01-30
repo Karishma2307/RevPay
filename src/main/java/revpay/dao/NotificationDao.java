@@ -5,9 +5,13 @@ import revpay.model.Notification;
 
 public interface NotificationDao {
 
-    long createNotification(Notification notification);
+    void create(long userId, String type, String title, String message);
 
-    List<Notification> findByUserId(long userId, boolean unreadOnly);
+    List<Notification> findByUserId(long userId);
 
-    void markAllRead(long userId);
+    List<Notification> findUnreadByUserId(long userId);
+
+    void markAsRead(long userId, long nId);
+
+    void markAllAsRead(long userId);
 }

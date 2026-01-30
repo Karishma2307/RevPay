@@ -3,26 +3,32 @@ package revpay.menu;
 import java.util.Scanner;
 
 import revpay.model.User;
-import revpay.model.Wallet;
 import revpay.service.BusinessAnalyticsService;
 import revpay.service.InvoiceService;
 import revpay.service.LoanService;
-import revpay.service.NotificationService;
+import revpay.service.PaymentMethodService;
 import revpay.service.TransactionHistoryService;
 import revpay.service.WalletService;
+import revpay.service.NotificationService;
 import revpay.util.ConsoleUtil;
+import revpay.util.SessionManager;
 
 public class BusinessMenu {
 
-    private Scanner sc;
-    private User user;
+    private final Scanner sc;
+    private final User user;
 
-    private NotificationService notificationService = new NotificationService();
-    private InvoiceService invoiceService = new InvoiceService(notificationService);
-    private WalletService walletService = new WalletService();
-    private LoanService loanService = new LoanService(notificationService);
-    private TransactionHistoryService historyService = new TransactionHistoryService();
-    private BusinessAnalyticsService analyticsService = new BusinessAnalyticsService();
+    private final WalletService walletService = new WalletService();
+    private final TransactionHistoryService txHistoryService = new TransactionHistoryService();
+    private final PaymentMethodService paymentMethodService = new PaymentMethodService();
+    private final NotificationService notificationService = new NotificationService();
+
+    private final InvoiceService invoiceService = new InvoiceService();
+    private final LoanService loanService = new LoanService();
+    private final BusinessAnalyticsService analyticsService = new BusinessAnalyticsService();
+
+    // ✅ Step 4: Session timeout tracker
+    private final SessionManager session = new SessionManager();
 
     public BusinessMenu(Scanner sc, User user) {
         this.sc = sc;
@@ -32,60 +38,95 @@ public class BusinessMenu {
     public void show() {
         while (true) {
 
-            Wallet wallet = walletService.getWallet(user.getUserId());
-
-            System.out.println("========= RevPay Dashboard - Business =========");
-            System.out.println("Business Account: " + user.getFullName() + " (" + user.getAccountId() + ")");
-            if (wallet != null) {
-                System.out.printf("Wallet Balance: $%.2f  Currency: %s%n",
-                        wallet.getBalance(), wallet.getCurrency());
+            // ✅ Auto logout on inactivity
+            if (session.isExpired()) {
+                ConsoleUtil.printHeader("Session Timeout");
+                System.out.println("[INFO] You were logged out due to inactivity.");
+                ConsoleUtil.pause(sc);
+                return;
             }
-            System.out.println("------------------------------------------------");
-            System.out.println("1. Wallet: Add Money");
-            System.out.println("2. Create Invoice");
-            System.out.println("3. Manage Invoices");
-            System.out.println("4. Business Loans");
-            System.out.println("5. Transaction History");
-            System.out.println("6. Business Analytics");
-            System.out.println("7. Notifications");
-            System.out.println("8. Security & Settings (TODO)");
-            System.out.println("9. Logout");
-            System.out.println("------------------------------------------------");
+
+            ConsoleUtil.printHeader("RevPay Dashboard - Business");
+            System.out.println("Business User: " + user.getFullName() + "   Account ID: " + user.getAccountId());
+            System.out.println("---------------------------------------------------");
+            System.out.println("1. Create Invoice");
+            System.out.println("2. Manage Invoices (Pay/Cancel/View)");
+            System.out.println("3. Apply for Loan");
+            System.out.println("4. Repay Loan");
+            System.out.println("5. Wallet: Add Money (from Card)");
+            System.out.println("6. Wallet: Withdraw (to Bank)");
+            System.out.println("7. Manage Payment Methods");
+            System.out.println("8. Transaction History (Filter/Search/Export)");
+            System.out.println("9. Notifications");
+            System.out.println("10. Business Analytics");
+            System.out.println("11. Logout");
+            System.out.println("---------------------------------------------------");
             System.out.print("Choose an option: ");
+
             String choice = sc.nextLine();
 
-            if ("1".equals(choice)) {
-                walletService.addMoney(sc, wallet, notificationService);
+            // ✅ user activity
+            session.touch();
 
-            } else if ("2".equals(choice)) {
-                invoiceService.createInvoice(sc, user);
+            switch (choice) {
+                case "1":
+                    invoiceService.createInvoice(sc, user);
+                    session.touch();
+                    break;
 
-            } else if ("3".equals(choice)) {
-                invoiceService.manageInvoices(sc, user);
+                case "2":
+                    invoiceService.manageInvoices(sc, user);
+                    session.touch();
+                    break;
 
-            } else if ("4".equals(choice)) {
-                loanService.manageLoans(sc, user);
+                case "3":
+                    loanService.applyLoan(sc, user);
+                    session.touch();
+                    break;
 
-            } else if ("5".equals(choice)) {
-                historyService.showHistory(sc, user);
+                case "4":
+                    loanService.repayLoan(sc, user);
+                    session.touch();
+                    break;
 
-            } else if ("6".equals(choice)) {
-                analyticsService.showAnalytics(sc, user);
+                case "5":
+                    walletService.addMoneyFromCard(sc, user);
+                    session.touch();
+                    break;
 
-            } else if ("7".equals(choice)) {
-                notificationService.showNotifications(sc, user.getUserId());
+                case "6":
+                    walletService.withdrawToBank(sc, user);
+                    session.touch();
+                    break;
 
-            } else if ("8".equals(choice)) {
-                System.out.println("[TODO] Security & Settings for business account.");
-                ConsoleUtil.pause(sc);
+                case "7":
+                    paymentMethodService.manage(sc, user.getUserId());
+                    session.touch();
+                    break;
 
-            } else if ("9".equals(choice)) {
-                System.out.println("Logging out...");
-                break;
+                case "8":
+                    txHistoryService.showFilteredHistory(sc, user);
+                    session.touch();
+                    break;
 
-            } else {
-                System.out.println("[ERROR] Invalid option.");
-                ConsoleUtil.pause(sc);
+                case "9":
+                    notificationService.showNotificationsMenu(sc, user.getUserId());
+                    session.touch();
+                    break;
+
+                case "10":
+                    analyticsService.showAnalytics(sc, user);
+                    session.touch();
+                    break;
+
+                case "11":
+                    System.out.println("[INFO] Logged out.");
+                    ConsoleUtil.pause(sc);
+                    return;
+
+                default:
+                    System.out.println("[ERROR] Invalid option.");
+                    ConsoleUtil.pause(sc);
             }
         }
     }
