@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="TRACE">
+
+    <Appenders>
+        <File name="FileAppender"
+              fileName="logs/revpay.log"
+              createOnDemand="false"
+              append="true">
+            <PatternLayout pattern="%d %-5level %c - %msg%n"/>
+        </File>
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="FileAppender"/>
+        </Root>
+    </Loggers>
+
+</Configuration>

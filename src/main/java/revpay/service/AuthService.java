@@ -3,6 +3,9 @@ package revpay.service;
 import java.util.Random;
 import java.util.Scanner;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import revpay.dao.UserDao;
 import revpay.dao.WalletDao;
 import revpay.dao.impl.UserDaoImpl;
@@ -13,6 +16,8 @@ import revpay.util.HashUtil;
 import revpay.util.ValidationUtil;
 
 public class AuthService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private UserDao userDao = new UserDaoImpl();
     private WalletDao walletDao = new WalletDaoImpl();
@@ -31,6 +36,7 @@ public class AuthService {
     // =======================
     public User register() {
         ConsoleUtil.printHeader("Registration");
+        logger.info("Registration flow started");
 
         System.out.println("Select account type:");
         System.out.println("1. Personal Account");
@@ -42,6 +48,7 @@ public class AuthService {
         if ("1".equals(choice)) accountType = "PERSONAL";
         else if ("2".equals(choice)) accountType = "BUSINESS";
         else {
+            logger.warn("Registration failed: invalid account type choice='{}'", choice);
             System.out.println("[ERROR] Invalid choice.");
             ConsoleUtil.pause(sc);
             return null;
@@ -54,6 +61,7 @@ public class AuthService {
         System.out.print("Full Name : ");
         String fullName = sc.nextLine();
         if (!ValidationUtil.isNonEmpty(fullName)) {
+            logger.warn("Registration failed: empty full name (accountType={})", accountType);
             System.out.println("[ERROR] Full name cannot be empty.");
             ConsoleUtil.pause(sc);
             return null;
@@ -64,11 +72,14 @@ public class AuthService {
         System.out.print("Username  : ");
         String username = sc.nextLine();
         if (!ValidationUtil.isNonEmpty(username)) {
+            logger.warn("Registration failed: empty username (accountType={}, fullName='{}')",
+                    accountType, user.getFullName());
             System.out.println("[ERROR] Username cannot be empty.");
             ConsoleUtil.pause(sc);
             return null;
         }
         if (userDao.findByUsername(username.trim()) != null) {
+            logger.warn("Registration failed: username already taken username='{}'", username.trim());
             System.out.println("[ERROR] Username already taken.");
             ConsoleUtil.pause(sc);
             return null;
@@ -79,11 +90,13 @@ public class AuthService {
         System.out.print("Email     : ");
         String email = sc.nextLine();
         if (!ValidationUtil.isValidEmail(email)) {
+            logger.warn("Registration failed: invalid email format email='{}'", email);
             System.out.println("[ERROR] Invalid email format.");
             ConsoleUtil.pause(sc);
             return null;
         }
         if (userDao.findByEmail(email.trim()) != null) {
+            logger.warn("Registration failed: email already registered email='{}'", email.trim());
             System.out.println("[ERROR] Email already registered.");
             ConsoleUtil.pause(sc);
             return null;
@@ -94,39 +107,47 @@ public class AuthService {
         System.out.print("Phone     : ");
         String phone = sc.nextLine();
         if (!ValidationUtil.isValidPhone(phone)) {
+            logger.warn("Registration failed: invalid phone format phone='{}'", phone);
             System.out.println("[ERROR] Phone must be exactly 10 digits.");
             ConsoleUtil.pause(sc);
             return null;
         }
         if (userDao.findByPhone(phone.trim()) != null) {
+            logger.warn("Registration failed: phone already registered phone='{}'", phone.trim());
             System.out.println("[ERROR] Phone already registered.");
             ConsoleUtil.pause(sc);
             return null;
         }
         user.setPhone(phone.trim());
 
-        // Password
+        // Password (DO NOT LOG password)
         System.out.print("Password  : ");
         String pw1 = sc.nextLine();
         System.out.print("Confirm Password: ");
         String pw2 = sc.nextLine();
 
         if (!pw1.equals(pw2)) {
+            logger.warn("Registration failed: passwords do not match (username='{}', email='{}')",
+                    user.getUsername(), user.getEmail());
             System.out.println("[ERROR] Passwords do not match.");
             ConsoleUtil.pause(sc);
             return null;
         }
         if (!ValidationUtil.isValidPassword(pw1)) {
+            logger.warn("Registration failed: weak password (username='{}', email='{}')",
+                    user.getUsername(), user.getEmail());
             System.out.println("[ERROR] Weak password. Must contain uppercase, lowercase, digit, special char and min 8 chars.");
             ConsoleUtil.pause(sc);
             return null;
         }
         user.setPasswordHash(HashUtil.hash(pw1));
 
-        // Transaction PIN
+        // Transaction PIN (DO NOT LOG pin)
         System.out.print("Create 4-digit Transaction PIN: ");
         String pin = sc.nextLine();
         if (!ValidationUtil.isValidTxnPin(pin)) {
+            logger.warn("Registration failed: invalid txn pin format (username='{}', email='{}')",
+                    user.getUsername(), user.getEmail());
             System.out.println("[ERROR] PIN must be exactly 4 digits (0-9).");
             ConsoleUtil.pause(sc);
             return null;
@@ -145,26 +166,56 @@ public class AuthService {
 
         user.setAccountId(accountId);
 
-        long newId = userDao.createUser(user);
+        long newId;
+        try {
+            newId = userDao.createUser(user);
+        } catch (Exception e) {
+            logger.error("Registration failed: exception while creating user (username='{}', email='{}')",
+                    user.getUsername(), user.getEmail(), e);
+            System.out.println("[ERROR] Failed to create user.");
+            ConsoleUtil.pause(sc);
+            return null;
+        }
+
         if (newId <= 0) {
+            logger.error("Registration failed: createUser returned non-positive id (username='{}', email='{}', returnedId={})",
+                    user.getUsername(), user.getEmail(), newId);
             System.out.println("[ERROR] Failed to create user.");
             ConsoleUtil.pause(sc);
             return null;
         }
 
         // Create wallet row
-        walletDao.createWalletForUser(newId);
+        try {
+            walletDao.createWalletForUser(newId);
+            logger.info("Wallet created for new userId={}", newId);
+        } catch (Exception e) {
+            logger.error("Registration warning: user created but wallet creation failed userId={}", newId, e);
+            // You can decide whether to rollback in future.
+        }
 
         // If BUSINESS -> insert business profile details
         if ("BUSINESS".equals(accountType)) {
             boolean ok = businessProfileService.collectAndSave(sc, newId);
             if (!ok) {
+                logger.warn("Business profile not saved properly (userId={})", newId);
                 System.out.println("[WARN] Business profile was not saved properly. (But account is created)");
+            } else {
+                logger.info("Business profile saved (userId={})", newId);
             }
         }
 
         // Setup Security Questions
-        recoveryService.setupSecurityQuestions(sc, newId);
+        try {
+            recoveryService.setupSecurityQuestions(sc, newId);
+            logger.info("Security questions setup completed (userId={})", newId);
+        } catch (Exception e) {
+            logger.error("Security questions setup failed (userId={})", newId, e);
+            // Optional: still allow account creation; depends on your requirement.
+        }
+
+        logger.info("{} account created successfully (userId={}, username='{}', accountId='{}')",
+                accountType, newId, user.getUsername(), user.getAccountId());
 
         System.out.println("[INFO] " + accountType + " account created successfully.");
         System.out.println("[INFO] Your Account ID: " + user.getAccountId());
@@ -177,6 +228,7 @@ public class AuthService {
     // =======================
     public User login() {
         ConsoleUtil.printHeader("Login");
+        logger.info("Login flow started");
 
         System.out.println("Login using:");
         System.out.println("1. Email");
@@ -190,6 +242,7 @@ public class AuthService {
             System.out.print("Email   : ");
             String email = sc.nextLine();
             if (!ValidationUtil.isValidEmail(email)) {
+                logger.warn("Login failed: invalid email format email='{}'", email);
                 System.out.println("[ERROR] Invalid email format.");
                 ConsoleUtil.pause(sc);
                 return null;
@@ -200,6 +253,7 @@ public class AuthService {
             System.out.print("Phone   : ");
             String phone = sc.nextLine();
             if (!ValidationUtil.isValidPhone(phone)) {
+                logger.warn("Login failed: invalid phone format phone='{}'", phone);
                 System.out.println("[ERROR] Phone must be exactly 10 digits.");
                 ConsoleUtil.pause(sc);
                 return null;
@@ -207,25 +261,29 @@ public class AuthService {
             user = userDao.findByPhone(phone.trim());
 
         } else {
+            logger.warn("Login failed: invalid login choice='{}'", choice);
             System.out.println("[ERROR] Invalid choice.");
             ConsoleUtil.pause(sc);
             return null;
         }
 
         if (user == null) {
+            logger.warn("Login failed: user not found (loginChoice='{}')", choice);
             System.out.println("[ERROR] User not found.");
             ConsoleUtil.pause(sc);
             return null;
         }
 
         if ("LOCKED".equalsIgnoreCase(user.getStatus())) {
+            logger.warn("Login blocked: account locked (userId={}, username='{}')",
+                    user.getUserId(), user.getUsername());
             System.out.println("[ERROR] Account locked due to failed attempts.");
             ConsoleUtil.pause(sc);
             return null;
         }
 
         System.out.print("Password: ");
-        String pw = sc.nextLine();
+        String pw = sc.nextLine(); // DO NOT LOG
 
         if (!HashUtil.check(pw, user.getPasswordHash())) {
             int newAttempts = user.getFailedLoginAttempts() + 1;
@@ -233,8 +291,12 @@ public class AuthService {
 
             if (newAttempts >= 3) {
                 userDao.updateStatus(user.getUserId(), "LOCKED");
+                logger.warn("Account locked due to failed login attempts (userId={}, username='{}', attempts={})",
+                        user.getUserId(), user.getUsername(), newAttempts);
                 System.out.println("[ERROR] Too many failed attempts. Account locked.");
             } else {
+                logger.warn("Incorrect password (userId={}, username='{}', attempts={})",
+                        user.getUserId(), user.getUsername(), newAttempts);
                 System.out.println("[ERROR] Incorrect password. Attempts: " + newAttempts);
             }
             ConsoleUtil.pause(sc);
@@ -244,17 +306,20 @@ public class AuthService {
         // Reset attempts
         userDao.updateFailedAttempts(user.getUserId(), 0);
 
-        // Simulated 2FA
+        // Simulated 2FA (DO NOT LOG code)
         String code = String.format("%06d", new Random().nextInt(1000000));
         System.out.println("[2FA] Security code (simulated): " + code);
         System.out.print("Enter security code: ");
         String entered = sc.nextLine();
         if (!code.equals(entered)) {
+            logger.warn("Login failed: wrong 2FA code (userId={}, username='{}')",
+                    user.getUserId(), user.getUsername());
             System.out.println("[ERROR] Wrong security code.");
             ConsoleUtil.pause(sc);
             return null;
         }
 
+        logger.info("Login successful (userId={}, username='{}')", user.getUserId(), user.getUsername());
         System.out.println("[INFO] Login successful.");
         ConsoleUtil.pause(sc);
         return user;
@@ -264,6 +329,7 @@ public class AuthService {
     // FORGOT PASSWORD
     // =======================
     public void forgotPassword() {
+        logger.info("Forgot password flow started");
         recoveryService.forgotPassword(sc);
     }
 }
