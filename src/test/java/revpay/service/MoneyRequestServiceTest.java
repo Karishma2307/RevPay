@@ -1,126 +1,149 @@
 package revpay.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
+import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.Scanner;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import revpay.dao.MoneyRequestDao;
+import revpay.dao.TransactionDao;
+import revpay.dao.UserDao;
+import revpay.dao.WalletDao;
+import revpay.model.MoneyRequest;
 import revpay.model.User;
+import revpay.model.Wallet;
 import revpay.util.HashUtil;
 
+@ExtendWith(MockitoExtension.class)
 class MoneyRequestServiceTest {
 
     private MoneyRequestService service;
 
-    private PrintStream originalOut;
-    private ByteArrayOutputStream out;
+    // Mocks
+    private MoneyRequestDao moneyRequestDao;
+    private UserDao userDao;
+    private WalletDao walletDao;
+    private TransactionDao transactionDao;
+    private NotificationService notificationService;
+    private LowBalanceAlertService lowBalanceAlertService;
 
-    @BeforeEach
-    void setup() {
-        service = new MoneyRequestService();
-        originalOut = System.out;
-        out = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(out));
-    }
+    private User requester;
+    private User payer;
 
-    @AfterEach
-    void tearDown() {
-        System.setOut(originalOut);
-    }
-
-    // Prevent crash because ConsoleUtil.pause(sc) consumes nextLine()
     private String extraEnters() {
         return "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
     }
 
-    private User user(long id, String fullName, String txnPin) {
-        User u = new User();
-        u.setUserId(id);
-        u.setFullName(fullName);
-        u.setTxnPinHash(HashUtil.hash(txnPin));
-        return u;
+    @BeforeEach
+    void setup() throws Exception {
+        service = new MoneyRequestService();
+
+        moneyRequestDao = mock(MoneyRequestDao.class);
+        userDao = mock(UserDao.class);
+        walletDao = mock(WalletDao.class);
+        transactionDao = mock(TransactionDao.class);
+        notificationService = mock(NotificationService.class);
+        lowBalanceAlertService = mock(LowBalanceAlertService.class);
+
+        // inject mocks
+        inject(service, "moneyRequestDao", moneyRequestDao);
+        inject(service, "userDao", userDao);
+        inject(service, "walletDao", walletDao);
+        inject(service, "transactionDao", transactionDao);
+        inject(service, "notificationService", notificationService);
+        inject(service, "lowBalanceAlertService", lowBalanceAlertService);
+
+        requester = new User();
+        requester.setUserId(1L);
+        requester.setFullName("Requester");
+
+        payer = new User();
+        payer.setUserId(2L);
+        payer.setFullName("Payer");
+        payer.setTxnPinHash(HashUtil.hash("1111"));
     }
 
-    // ✅ Test 1: createRequest -> invalid choice
+    // ------------------------------------------------
+    // TEST 1: createRequest -> invalid choice
+    // ------------------------------------------------
     @Test
-    void createRequest_fail_invalidChoice() {
-        User requester = user(10L, "Requester", "1111");
-
-        String input =
-                "9\n" +          // invalid
-                extraEnters();
+    void createRequest_invalidChoice_shouldExitEarly() {
+        String input = "9\n" + extraEnters();
 
         service.createRequest(new Scanner(input), requester);
 
-        String output = out.toString();
-        assertTrue(output.contains("Invalid choice") || output.contains("[ERROR]"),
-                "Expected: Invalid choice error");
+        verifyNoInteractions(userDao, moneyRequestDao, notificationService);
     }
 
-    // ✅ Test 2: createRequest -> payer not found (email)
+    // ------------------------------------------------
+    // TEST 2: createRequest -> payer not found
+    // ------------------------------------------------
     @Test
-    void createRequest_fail_userNotFound() {
-        User requester = user(10L, "Requester", "1111");
+    void createRequest_userNotFound_shouldExitEarly() {
+        when(userDao.findByEmail("no@test.com")).thenReturn(null);
 
         String input =
                 "1\n" +
-                "no_such_user@test.com\n" +
+                "no@test.com\n" +
                 extraEnters();
 
         service.createRequest(new Scanner(input), requester);
 
-        String output = out.toString();
-        assertTrue(output.contains("User not found") || output.contains("[ERROR]"),
-                "Expected: User not found error");
+        verify(userDao).findByEmail("no@test.com");
+        verifyNoInteractions(moneyRequestDao, notificationService);
     }
 
-    // ✅ Test 3: createRequest -> invalid amount (non-number)
-    // NOTE: If payer doesn't exist in DB, it will stop at "User not found" and still pass.
+    // ------------------------------------------------
+    // TEST 3: acceptRequest -> no incoming requests
+    // ------------------------------------------------
     @Test
-    void createRequest_fail_invalidAmount_nonNumber() {
-        User requester = user(10L, "Requester", "1111");
+    void acceptRequest_noIncomingRequests_shouldExit() {
+        when(moneyRequestDao.findIncoming(2L)).thenReturn(Collections.emptyList());
 
-        String input =
-                "1\n" +
-                "no_such_user@test.com\n" +  // likely not found in DB
-                "abc\n" +                    // invalid amount
-                extraEnters();
+        service.acceptRequest(new Scanner(extraEnters()), payer);
 
-        service.createRequest(new Scanner(input), requester);
-
-        String output = out.toString();
-        assertTrue(
-            output.contains("Invalid amount") || output.contains("User not found") || output.contains("[ERROR]"),
-            "Expected: Invalid amount OR user not found (DB-safe)"
-        );
+        verify(moneyRequestDao).findIncoming(2L);
+        verifyNoInteractions(walletDao, transactionDao, notificationService);
     }
 
-    // ✅ Test 4: acceptRequest -> no incoming requests
+    // ------------------------------------------------
+    // TEST 4: declineRequest -> no incoming requests
+    // ------------------------------------------------
     @Test
-    void acceptRequest_noIncomingRequests() {
-        User payer = user(-99999L, "Payer", "2222"); // user likely has no incoming requests
+    void declineRequest_noIncomingRequests_shouldExit() {
+        when(moneyRequestDao.findIncoming(2L)).thenReturn(Collections.emptyList());
 
-        String input = extraEnters();
-        service.acceptRequest(new Scanner(input), payer);
+        service.declineRequest(new Scanner(extraEnters()), payer);
 
-        String output = out.toString();
-        assertTrue(output.contains("No incoming requests") || output.contains("No incoming"),
-                "Expected: No incoming requests message");
+        verify(moneyRequestDao).findIncoming(2L);
+        verifyNoInteractions(notificationService);
     }
 
-    // ✅ Test 5: declineRequest -> no incoming requests
+    // ------------------------------------------------
+    // TEST 5: cancelRequest -> no outgoing requests
+    // ------------------------------------------------
     @Test
-    void declineRequest_noIncomingRequests() {
-        User payer = user(-99999L, "Payer", "2222");
+    void cancelRequest_noOutgoingRequests_shouldExit() {
+        when(moneyRequestDao.findOutgoing(1L)).thenReturn(Collections.emptyList());
 
-        String input = extraEnters();
-        service.declineRequest(new Scanner(input), payer);
+        service.cancelRequest(new Scanner(extraEnters()), requester);
 
-        String output = out.toString();
-        assertTrue(output.contains("No incoming requests") || output.contains("No incoming"),
-                "Expected: No incoming requests message");
+        verify(moneyRequestDao).findOutgoing(1L);
+        verifyNoInteractions(notificationService);
+    }
+
+    // ------------------------------------------------
+    // Reflection helper
+    // ------------------------------------------------
+    private void inject(Object target, String field, Object mock) throws Exception {
+        Field f = target.getClass().getDeclaredField(field);
+        f.setAccessible(true);
+        f.set(target, mock);
     }
 }

@@ -5,7 +5,6 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Project Coordinates -->
     <groupId>com.revpay</groupId>
     <artifactId>revpay</artifactId>
     <version>1.0.0</version>
@@ -14,28 +13,52 @@
     <name>RevPay</name>
     <description>Console-based Digital Payment Application</description>
 
-    <!-- Java Version -->
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- keep versions in one place -->
+        <junit.jupiter.version>5.10.2</junit.jupiter.version>
+        <mockito.version>5.11.0</mockito.version>
     </properties>
 
     <dependencies>
-    <dependency>
-  <groupId>org.mockito</groupId>
-  <artifactId>mockito-core</artifactId>
-  <version>5.11.0</version>
-  <scope>test</scope>
-</dependency>
 
-<dependency>
-  <groupId>org.mockito</groupId>
-  <artifactId>mockito-junit-jupiter</artifactId>
-  <version>5.11.0</version>
-  <scope>test</scope>
-</dependency>
+        <!-- ===================== -->
+        <!-- JUnit 5 -->
+        <!-- ===================== -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
 
+        <!-- Optional (only if you use @Suite / @SelectPackages) -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-suite</artifactId>
+            <version>1.10.2</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ===================== -->
+        <!-- Mockito -->
+        <!-- ===================== -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- ===================== -->
         <!-- BCrypt for Passwords -->
@@ -45,75 +68,60 @@
             <artifactId>jbcrypt</artifactId>
             <version>0.4</version>
         </dependency>
+
+        <!-- ===================== -->
+        <!-- Logging -->
+        <!-- ===================== -->
         <dependency>
-  <groupId>org.junit.jupiter</groupId>
-  <artifactId>junit-jupiter</artifactId>
-  <version>5.10.2</version>
-  <scope>test</scope>
-</dependency>
-<!-- JUnit 5 suite support (needed for @Suite / @SelectPackages) -->
-<dependency>
-    <groupId>org.junit.platform</groupId>
-    <artifactId>junit-platform-suite</artifactId>
-    <version>1.10.2</version>
-    <scope>test</scope>
-</dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.9</version>
+        </dependency>
 
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.22.1</version>
+        </dependency>
 
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.22.1</version>
+        </dependency>
 
-<!-- SLF4J API -->
-<dependency>
-    <groupId>org.slf4j</groupId>
-    <artifactId>slf4j-api</artifactId>
-    <version>2.0.9</version>
-</dependency>
-
-<!-- Log4j2 -->
-<dependency>
-    <groupId>org.apache.logging.log4j</groupId>
-    <artifactId>log4j-api</artifactId>
-    <version>2.22.1</version>
-</dependency>
-
-<dependency>
-    <groupId>org.apache.logging.log4j</groupId>
-    <artifactId>log4j-core</artifactId>
-    <version>2.22.1</version>
-</dependency>
-
-<!-- SLF4J → Log4j2 bridge -->
-<dependency>
-    <groupId>org.apache.logging.log4j</groupId>
-    <artifactId>log4j-slf4j2-impl</artifactId>
-    <version>2.22.1</version>
-</dependency>
-
-
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <version>2.22.1</version>
+        </dependency>
 
         <!-- ===================== -->
-        <!-- Oracle JDBC (10g) -->
+        <!-- Oracle JDBC (local jar) -->
+        <!-- Put ojdbc14.jar in /lib folder -->
         <!-- ===================== -->
-        <!-- NOTE:
-             Oracle JDBC is NOT available on Maven Central.
-             You must place ojdbc14.jar inside projectRoot/lib/
-        -->
-       <dependency>
-    <groupId>com.oracle</groupId>
-    <artifactId>ojdbc14</artifactId>
-    <version>10.2.0.1</version>
-</dependency>
-
+        <dependency>
+            <groupId>com.oracle</groupId>
+            <artifactId>ojdbc14</artifactId>
+            <version>10.2.0.1</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/ojdbc14.jar</systemPath>
+        </dependency>
 
     </dependencies>
 
     <build>
         <plugins>
-        <plugin>
-  <groupId>org.apache.maven.plugins</groupId>
-  <artifactId>maven-surefire-plugin</artifactId>
-  <version>3.2.5</version>
-</plugin>
 
+            <!-- ✅ Surefire: required for JUnit 5 in many IDE setups -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
 
             <!-- Java Compiler Plugin -->
             <plugin>
@@ -138,8 +146,4 @@
 
         </plugins>
     </build>
-
 </project>
-
-
-
