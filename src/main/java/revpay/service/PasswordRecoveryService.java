@@ -22,7 +22,7 @@ public class PasswordRecoveryService {
     private UserDao userDao = new UserDaoImpl();
     private SecurityQuestionDao questionDao = new SecurityQuestionDaoImpl();
 
-    // ===== called after registration =====
+    
     public void setupSecurityQuestions(Scanner sc, long userId) {
         ConsoleUtil.printHeader("Security Questions Setup");
 
@@ -33,7 +33,7 @@ public class PasswordRecoveryService {
             return;
         }
 
-        // show questions
+      
         System.out.println("Choose 2 security questions (enter number).");
         for (int i = 0; i < questions.size(); i++) {
             System.out.println((i + 1) + ". " + questions.get(i).getQuestion());
@@ -74,7 +74,7 @@ public class PasswordRecoveryService {
         ConsoleUtil.pause(sc);
     }
 
-    // ===== forgot password flow =====
+    
     public void forgotPassword(Scanner sc) {
         ConsoleUtil.printHeader("Forgot Password");
 
@@ -118,7 +118,7 @@ public class PasswordRecoveryService {
             return;
         }
 
-        // pull 2 saved questions for this user
+        
         UserQuestion uq1 = getFirstUserQuestion(user.getUserId());
         UserQuestion uq2 = getSecondUserQuestion(user.getUserId(), uq1 == null ? -1 : uq1.qId);
 
@@ -128,7 +128,7 @@ public class PasswordRecoveryService {
             return;
         }
 
-        // show questions
+        
         System.out.println("Answer the following security questions:");
 
         System.out.println("Q1: " + uq1.question);
@@ -148,7 +148,7 @@ public class PasswordRecoveryService {
             return;
         }
 
-        // reset password
+        
         System.out.print("Enter NEW password: ");
         String p1 = sc.nextLine();
         System.out.print("Confirm NEW password: ");
@@ -171,7 +171,7 @@ public class PasswordRecoveryService {
         ConsoleUtil.pause(sc);
     }
 
-    // -------------------- helpers --------------------
+    
 
     private int pickQuestion(Scanner sc, int max, String prompt) {
         System.out.print(prompt);

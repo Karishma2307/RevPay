@@ -29,7 +29,7 @@ public class PaymentMethodDaoImpl implements PaymentMethodDao {
 
             ps.executeUpdate();
 
-            // Oracle safe way: get current sequence value from the same session
+            
             try (Statement st = con.createStatement();
                  ResultSet rs = st.executeQuery("SELECT PAYMENT_METHODS_SEQ.CURRVAL AS ID FROM DUAL")) {
                 if (rs.next()) return rs.getLong("ID");

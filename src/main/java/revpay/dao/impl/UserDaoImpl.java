@@ -154,18 +154,18 @@ public class UserDaoImpl implements UserDao {
         try {
             conn = DBConnection.getConnection();
 
-            // 1) get new USER_ID from sequence
+           
             st = conn.createStatement();
             rs = st.executeQuery("SELECT SEQ_USERS.NEXTVAL FROM DUAL");
             if (rs.next()) newId = rs.getLong(1);
 
-            // close seq resources early
+           
             try { if (rs != null) rs.close(); } catch (Exception e) {}
             try { if (st != null) st.close(); } catch (Exception e) {}
             rs = null;
             st = null;
 
-            // 2) insert row with that id
+           
             ps = conn.prepareStatement(sql);
             ps.setLong(1, newId);
             ps.setString(2, user.getAccountId());
@@ -195,7 +195,7 @@ public class UserDaoImpl implements UserDao {
     }
 
     public void updateFailedAttempts(long userId, int attempts) {
-        // Removed UPDATED_AT to avoid ORA-00904 if column doesn't exist
+       
         String sql = "UPDATE USERS SET FAILED_LOGIN_ATTEMPTS = ? WHERE USER_ID = ?";
         Connection conn = null;
         PreparedStatement ps = null;
@@ -213,7 +213,7 @@ public class UserDaoImpl implements UserDao {
     }
 
     public void updateStatus(long userId, String status) {
-        // Removed UPDATED_AT to avoid ORA-00904 if column doesn't exist
+        
         String sql = "UPDATE USERS SET STATUS = ? WHERE USER_ID = ?";
         Connection conn = null;
         PreparedStatement ps = null;

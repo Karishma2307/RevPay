@@ -3,12 +3,12 @@ package revpay.model;
 public class PaymentMethod {
     private long methodId;
     private long userId;
-    private String type;      // CARD / BANK etc
-    private String label;     // "My Visa Card"
-    private String provider;  // VISA / MASTERCARD
-    private String last4;     // "1234"
-    private String encNumber; // encrypted card/bank number
-    private String isDefault; // 'Y' or 'N'
+    private String type;    
+    private String label;    
+    private String provider;  
+    private String last4;     
+    private String encNumber; 
+    private String isDefault;
 
     public long getMethodId() { return methodId; }
     public void setMethodId(long methodId) { this.methodId = methodId; }

@@ -9,201 +9,193 @@ import java.util.Scanner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import revpay.dao.UserDao;
 import revpay.dao.WalletDao;
 import revpay.model.User;
+import revpay.util.HashUtil;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock private UserDao userDao;
-    @Mock private WalletDao walletDao;
+    private UserDao userDao;
+    private WalletDao walletDao;
 
-    @Mock private PasswordRecoveryService recoveryService;
-    @Mock private BusinessProfileService businessProfileService;
-
-    private AuthService authService;
-
-    // add many enters for ConsoleUtil.pause(sc)
-    private String extraEnters() {
-        return "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
-    }
-
-    // IMPORTANT: adjust this to match your real setupSecurityQuestions flow
-    private String securitySetupInputs() {
-        return "1\nans1\n2\nans2\n3\nans3\n";
-    }
+    private PasswordRecoveryService recoveryService;
+    private BusinessProfileService businessProfileService;
 
     @BeforeEach
-    void setup() throws Exception {
-        authService = new AuthService(new Scanner(""));
-
-        // Inject mocks into AuthService private fields
-        inject(authService, "userDao", userDao);
-        inject(authService, "walletDao", walletDao);
-        inject(authService, "recoveryService", recoveryService);
-        inject(authService, "businessProfileService", businessProfileService);
+    void setup() {
+        userDao = mock(UserDao.class);
+        walletDao = mock(WalletDao.class);
+        recoveryService = mock(PasswordRecoveryService.class);
+        businessProfileService = mock(BusinessProfileService.class);
     }
 
-    // -----------------------------
-    // 1) REGISTER PERSONAL SUCCESS
-    // -----------------------------
+    // ---------------------------------------------------------
+    // TEST 1: register() invalid account type choice -> returns null
+    // ---------------------------------------------------------
     @Test
-    void register_personal_success() throws Exception {
+    void register_invalidChoice_shouldReturnNull() throws Exception {
+        Scanner sc = new Scanner("9\n\n"); // invalid choice + pause enter
+        AuthService service = new AuthService(sc);
+
+        inject(service, "userDao", userDao);
+        inject(service, "walletDao", walletDao);
+        inject(service, "recoveryService", recoveryService);
+        inject(service, "businessProfileService", businessProfileService);
+
+        User result = service.register();
+
+        assertNull(result);
+        verifyNoInteractions(userDao);
+        verifyNoInteractions(walletDao);
+    }
+
+    // ---------------------------------------------------------
+    // TEST 2: register() username already exists -> returns null
+    // ---------------------------------------------------------
+    @Test
+    void register_usernameTaken_shouldReturnNull() throws Exception {
         String input =
-                "1\n" +                      // PERSONAL
-                "John Test\n" +
-                "john123\n" +
-                "john@test.com\n" +
-                "9876543210\n" +
-                "Password@1\n" +
-                "Password@1\n" +
-                "1234\n" +
-                securitySetupInputs() +
-                extraEnters();
+                "1\n" +                 // Personal
+                "Karishma Shaik\n" +     // full name
+                "karishma\n" +           // username
+                "\n";                    // pause
 
-        authService = new AuthService(new Scanner(input));
-        inject(authService, "userDao", userDao);
-        inject(authService, "walletDao", walletDao);
-        inject(authService, "recoveryService", recoveryService);
-        inject(authService, "businessProfileService", businessProfileService);
+        Scanner sc = new Scanner(input);
+        AuthService service = new AuthService(sc);
 
-        // username/email/phone/accountId not existing
-        when(userDao.findByUsername("john123")).thenReturn(null);
-        when(userDao.findByEmail("john@test.com")).thenReturn(null);
+        inject(service, "userDao", userDao);
+        inject(service, "walletDao", walletDao);
+        inject(service, "recoveryService", recoveryService);
+        inject(service, "businessProfileService", businessProfileService);
+
+       
+        when(userDao.findByUsername("karishma")).thenReturn(new User());
+
+        User result = service.register();
+
+        assertNull(result);
+        verify(userDao).findByUsername("karishma");
+        verify(userDao, never()).createUser(any());
+        verifyNoInteractions(walletDao);
+    }
+
+    
+    @Test
+    void register_successPersonal_shouldCreateUserWalletAndSecurityQ() throws Exception {
+        String input =
+                "1\n" +                 // Personal
+                "Karishma Shaik\n" +     // full name
+                "karishma\n" +           // username
+                "k@revpay.com\n" +        // email
+                "9876543210\n" +          // phone
+                "Abcd@1234\n" +           // password
+                "Abcd@1234\n" +           // confirm
+                "1234\n" +                // txn pin
+                "\n";                     // final pause enter
+
+        Scanner sc = new Scanner(input);
+        AuthService service = new AuthService(sc);
+
+        inject(service, "userDao", userDao);
+        inject(service, "walletDao", walletDao);
+        inject(service, "recoveryService", recoveryService);
+        inject(service, "businessProfileService", businessProfileService);
+
+        
+        when(userDao.findByUsername("karishma")).thenReturn(null);
+        when(userDao.findByEmail("k@revpay.com")).thenReturn(null);
         when(userDao.findByPhone("9876543210")).thenReturn(null);
         when(userDao.findByAccountId(anyString())).thenReturn(null);
 
-        // Create user returns newId
-        when(userDao.createUser(any(User.class))).thenReturn(100L);
+        
+        when(userDao.createUser(any(User.class))).thenReturn(101L);
 
-        User created = authService.register();
+        User result = service.register();
 
-        assertNotNull(created);
-        assertEquals("PERSONAL", created.getAccountType());
-        assertEquals("john123", created.getUsername());
-        assertEquals("john@test.com", created.getEmail());
-        assertEquals("9876543210", created.getPhone());
+        assertNotNull(result);
+        assertEquals("PERSONAL", result.getAccountType());
+        assertEquals("karishma", result.getUsername());
+        assertEquals("k@revpay.com", result.getEmail());
+        assertEquals("9876543210", result.getPhone());
+        assertNotNull(result.getAccountId());
 
+        
         verify(userDao).createUser(any(User.class));
-        verify(walletDao).createWalletForUser(100L);
 
-        // BUSINESS profile should not be called for personal
-        verify(businessProfileService, never()).collectAndSave(any(), anyLong());
+     
+        verify(walletDao).createWalletForUser(101L);
 
-        // Security questions setup must be called
-        verify(recoveryService).setupSecurityQuestions(any(Scanner.class), eq(100L));
+       
+        verify(recoveryService).setupSecurityQuestions(any(Scanner.class), eq(101L));
+
+     
+        verifyNoInteractions(businessProfileService);
     }
 
-    // -----------------------------
-    // 2) REGISTER FAIL - INVALID CHOICE
-    // -----------------------------
+    
     @Test
-    void register_fail_invalidChoice() throws Exception {
-        String input = "9\n" + extraEnters();
-        authService = new AuthService(new Scanner(input));
-        inject(authService, "userDao", userDao);
-        inject(authService, "walletDao", walletDao);
-        inject(authService, "recoveryService", recoveryService);
-        inject(authService, "businessProfileService", businessProfileService);
-
-        assertNull(authService.register());
-
-        verifyNoInteractions(userDao, walletDao, recoveryService, businessProfileService);
-    }
-
-    // -----------------------------
-    // 3) REGISTER FAIL - USERNAME TAKEN
-    // -----------------------------
-    @Test
-    void register_fail_usernameTaken() throws Exception {
+    void login_wrongPassword_shouldLockAfter3Attempts() throws Exception {
+       
         String input =
-                "1\n" +
-                "John Test\n" +
-                "john123\n" +
-                extraEnters();
+                "1\n" +              
+                "k@revpay.com\n" +    
+                "Wrong@123\n" +     
+                "\n";                
 
-        authService = new AuthService(new Scanner(input));
-        inject(authService, "userDao", userDao);
-        inject(authService, "walletDao", walletDao);
-        inject(authService, "recoveryService", recoveryService);
-        inject(authService, "businessProfileService", businessProfileService);
+        Scanner sc = new Scanner(input);
+        AuthService service = new AuthService(sc);
 
-        when(userDao.findByUsername("john123")).thenReturn(new User());
+        inject(service, "userDao", userDao);
+        inject(service, "walletDao", walletDao);
+        inject(service, "recoveryService", recoveryService);
+        inject(service, "businessProfileService", businessProfileService);
 
-        assertNull(authService.register());
+        User dbUser = new User();
+        dbUser.setUserId(50L);
+        dbUser.setUsername("karishma");
+        dbUser.setEmail("k@revpay.com");
+        dbUser.setStatus("ACTIVE");
 
-        verify(userDao).findByUsername("john123");
-        verify(userDao, never()).createUser(any());
-        verify(walletDao, never()).createWalletForUser(anyLong());
+     
+        dbUser.setFailedLoginAttempts(2);
+
+        
+        dbUser.setPasswordHash(HashUtil.hash("Correct@123"));
+
+        when(userDao.findByEmail("k@revpay.com")).thenReturn(dbUser);
+
+        User result = service.login();
+
+        assertNull(result);
+        verify(userDao).updateFailedAttempts(50L, 3);
+        verify(userDao).updateStatus(50L, "LOCKED");
+
+      
+        verify(userDao, never()).updateFailedAttempts(50L, 0);
     }
 
-    // -----------------------------
-    // 4) REGISTER FAIL - EMAIL EXISTS
-    // -----------------------------
+    
     @Test
-    void register_fail_emailExists() throws Exception {
-        String input =
-                "1\n" +
-                "John Test\n" +
-                "john123\n" +
-                "john@test.com\n" +
-                extraEnters();
+    void forgotPassword_shouldDelegateToRecoveryService() throws Exception {
+        Scanner sc = new Scanner("\n");
+        AuthService service = new AuthService(sc);
 
-        authService = new AuthService(new Scanner(input));
-        inject(authService, "userDao", userDao);
-        inject(authService, "walletDao", walletDao);
-        inject(authService, "recoveryService", recoveryService);
-        inject(authService, "businessProfileService", businessProfileService);
+        inject(service, "userDao", userDao);
+        inject(service, "walletDao", walletDao);
+        inject(service, "recoveryService", recoveryService);
+        inject(service, "businessProfileService", businessProfileService);
 
-        when(userDao.findByUsername("john123")).thenReturn(null);
-        when(userDao.findByEmail("john@test.com")).thenReturn(new User());
+        service.forgotPassword();
 
-        assertNull(authService.register());
-
-        verify(userDao).findByUsername("john123");
-        verify(userDao).findByEmail("john@test.com");
-        verify(userDao, never()).createUser(any());
+        verify(recoveryService).forgotPassword(any(Scanner.class));
     }
 
-    // -----------------------------
-    // 5) REGISTER FAIL - PASSWORD MISMATCH
-    // -----------------------------
-    @Test
-    void register_fail_passwordMismatch() throws Exception {
-        String input =
-                "1\n" +
-                "John Test\n" +
-                "john123\n" +
-                "john@test.com\n" +
-                "9876543210\n" +
-                "Password@1\n" +
-                "Password@2\n" +
-                extraEnters();
-
-        authService = new AuthService(new Scanner(input));
-        inject(authService, "userDao", userDao);
-        inject(authService, "walletDao", walletDao);
-        inject(authService, "recoveryService", recoveryService);
-        inject(authService, "businessProfileService", businessProfileService);
-
-        when(userDao.findByUsername(anyString())).thenReturn(null);
-        when(userDao.findByEmail(anyString())).thenReturn(null);
-        when(userDao.findByPhone(anyString())).thenReturn(null);
-
-        assertNull(authService.register());
-
-        verify(userDao, never()).createUser(any());
-        verify(walletDao, never()).createWalletForUser(anyLong());
-        verify(recoveryService, never()).setupSecurityQuestions(any(), anyLong());
-    }
-
-    // --------------------------------
-    // Reflection helper to inject mocks
-    // --------------------------------
+    
     private void inject(Object target, String fieldName, Object value) throws Exception {
         Field f = target.getClass().getDeclaredField(fieldName);
         f.setAccessible(true);

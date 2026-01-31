@@ -10,7 +10,7 @@ public class Loan {
     private double interestRate;
     private int termMonths;
     private String purpose;
-    private String status;            // PENDING, APPROVED, ACTIVE, CLOSED, REJECTED
+    private String status;            
     private double approvedAmount;
     private double outstandingAmount;
     private Date createdAt;

@@ -5,12 +5,12 @@ import java.util.Date;
 public class MoneyRequest {
 
     private long requestId;
-    private long fromUserId; // requester
-    private long toUserId;   // target who should pay
+    private long fromUserId; 
+    private long toUserId;   
     private double amount;
     private String currency;
     private String note;
-    private String status;   // PENDING, ACCEPTED, DECLINED, CANCELLED
+    private String status;   
     private Date createdAt;
     private Date updatedAt;
 

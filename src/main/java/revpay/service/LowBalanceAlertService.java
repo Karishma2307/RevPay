@@ -12,13 +12,13 @@ public class LowBalanceAlertService {
     private final NotificationService notificationService = new NotificationService();
     private final NotificationPrefDao prefDao = new NotificationPrefDaoImpl();
 
-    // Sends low balance alert if below threshold and not spammed
+    
     public void checkAndNotify(long userId) {
 
-        // Ensure preference row exists
+        
         prefDao.ensureExists(userId);
 
-        // If alerts disabled, do nothing
+        
         if (!prefDao.isEnabled(userId, "ALERT")) return;
 
         Wallet w = walletDao.getWalletByUserId(userId);
@@ -27,7 +27,7 @@ public class LowBalanceAlertService {
         int threshold = prefDao.getLowBalanceThreshold(userId);
 
         if (w.getBalance() < threshold) {
-            // Anti-spam: only once per 10 minutes
+            
             if (!prefDao.shouldSendLowBalanceAlert(userId)) return;
 
             notificationService.notifyUser(

@@ -12,7 +12,7 @@ public class PaymentMethodService {
 
     private final PaymentMethodDao paymentMethodDao = new PaymentMethodDaoImpl();
 
-    // Backward-compatible alias used by menus
+   
     public void manage(Scanner sc, long userId) {
         showMenu(sc, userId);
     }
@@ -22,18 +22,17 @@ public class PaymentMethodService {
             ConsoleUtil.printHeader("Payment Methods");
             System.out.println("1. Add Card");
             System.out.println("2. View My Payment Methods");
-            System.out.println("3. Set Default Payment Method");
-            System.out.println("4. Delete Payment Method");
-            System.out.println("5. Back");
+            
+            System.out.println("3. Delete Payment Method");
+            System.out.println("4. Back");
             System.out.print("Choice: ");
             String choice = sc.nextLine();
 
             switch (choice) {
                 case "1": addCard(sc, userId); break;
                 case "2": view(userId); break;
-                case "3": setDefault(sc, userId); break;
-                case "4": delete(sc, userId); break;
-                case "5": return;
+                case "3": delete(sc, userId); break;
+                case "4": return;
                 default: System.out.println("Invalid choice."); break;
             }
             ConsoleUtil.pause(sc);
@@ -105,17 +104,7 @@ public class PaymentMethodService {
         }
     }
 
-    public void setDefault(Scanner sc, long userId) {
-        view(userId);
-        System.out.print("Enter Method ID to set as default: ");
-        String in = sc.nextLine().trim();
-        long methodId;
-        try { methodId = Long.parseLong(in); }
-        catch (NumberFormatException e) { System.out.println("Invalid ID."); return; }
-
-        boolean ok = paymentMethodDao.setDefault(userId, methodId);
-        System.out.println(ok ? "Default updated." : "Method not found for this user.");
-    }
+    
 
     public void delete(Scanner sc, long userId) {
         view(userId);

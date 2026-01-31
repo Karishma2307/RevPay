@@ -24,14 +24,10 @@ public class MoneyRequestService {
     private final WalletDao walletDao = new WalletDaoImpl();
     private final TransactionDao transactionDao = new TransactionDaoImpl();
     private final NotificationService notificationService = new NotificationService();
-
-    // ✅ Step 5: low balance alerts
     private final LowBalanceAlertService lowBalanceAlertService = new LowBalanceAlertService();
 
-    // ========================
-    // CREATE REQUEST
-    // ========================
     public void createRequest(Scanner sc, User requester) {
+
         ConsoleUtil.printHeader("Request Money");
 
         System.out.println("Request from (who should pay you):");
@@ -84,8 +80,8 @@ public class MoneyRequestService {
         String note = sc.nextLine();
 
         MoneyRequest req = new MoneyRequest();
-        req.setFromUserId(requester.getUserId()); // requester
-        req.setToUserId(payer.getUserId());       // payer
+        req.setFromUserId(requester.getUserId());
+        req.setToUserId(payer.getUserId());
         req.setAmount(amount);
         req.setStatus("PENDING");
         req.setNote(note);
@@ -96,16 +92,13 @@ public class MoneyRequestService {
                 payer.getUserId(),
                 "REQUEST",
                 "Money Request",
-                requester.getFullName() + " requested $" + amount
+                requester.getFullName() + " requested ₹" + amount
         );
 
         System.out.println("[INFO] Request created. ID: " + id);
         ConsoleUtil.pause(sc);
     }
 
-    // ========================
-    // VIEW INCOMING (payer view)
-    // ========================
     public void viewIncoming(Scanner sc, User user) {
         ConsoleUtil.printHeader("Incoming Requests");
 
@@ -119,15 +112,13 @@ public class MoneyRequestService {
         for (MoneyRequest r : list) {
             System.out.println("ID: " + r.getRequestId()
                     + " | From(UserId): " + r.getFromUserId()
-                    + " | Amount: $" + r.getAmount()
+                    + " | Amount: ₹" + r.getAmount()
                     + " | Status: " + r.getStatus());
         }
+
         ConsoleUtil.pause(sc);
     }
 
-    // ========================
-    // VIEW OUTGOING (requester view)
-    // ========================
     public void viewOutgoing(Scanner sc, User user) {
         ConsoleUtil.printHeader("Outgoing Requests");
 
@@ -141,16 +132,15 @@ public class MoneyRequestService {
         for (MoneyRequest r : list) {
             System.out.println("ID: " + r.getRequestId()
                     + " | To(UserId): " + r.getToUserId()
-                    + " | Amount: $" + r.getAmount()
+                    + " | Amount: ₹" + r.getAmount()
                     + " | Status: " + r.getStatus());
         }
+
         ConsoleUtil.pause(sc);
     }
 
-    // ========================
-    // ACCEPT REQUEST (payer pays)
-    // ========================
     public void acceptRequest(Scanner sc, User payer) {
+
         ConsoleUtil.printHeader("Accept Money Request");
 
         List<MoneyRequest> incoming = moneyRequestDao.findIncoming(payer.getUserId());
@@ -166,7 +156,7 @@ public class MoneyRequestService {
                 anyPending = true;
                 System.out.println("ID: " + r.getRequestId()
                         + " | From(UserId): " + r.getFromUserId()
-                        + " | Amount: $" + r.getAmount()
+                        + " | Amount: ₹" + r.getAmount()
                         + " | Note: " + (r.getNote() == null ? "" : r.getNote()));
             }
         }
@@ -195,7 +185,6 @@ public class MoneyRequestService {
             return;
         }
 
-        // ✅ Txn PIN verification (requirement)
         System.out.print("Enter Transaction PIN: ");
         String pin = sc.nextLine();
         if (!HashUtil.check(pin, payer.getTxnPinHash())) {
@@ -217,23 +206,19 @@ public class MoneyRequestService {
             receiverWallet = walletDao.getWalletByUserId(req.getFromUserId());
         }
 
-        double newPayerBal = payerWallet.getBalance() - req.getAmount();
-        double newReceiverBal = receiverWallet.getBalance() + req.getAmount();
+        walletDao.updateBalance(payer.getUserId(), payerWallet.getBalance() - req.getAmount());
+        walletDao.updateBalance(req.getFromUserId(), receiverWallet.getBalance() + req.getAmount());
 
-        walletDao.updateBalance(payer.getUserId(), newPayerBal);
-        walletDao.updateBalance(req.getFromUserId(), newReceiverBal);
+        try { lowBalanceAlertService.checkAndNotify(payer.getUserId()); } catch (Exception ignored) {}
 
-        // ✅ Step 5: low balance alert for payer after deduction
-        lowBalanceAlertService.checkAndNotify(payer.getUserId());
-
+        // ✅ FIXED: 6 params only
         transactionDao.createTransaction(
                 payer.getUserId(),
                 req.getFromUserId(),
                 req.getAmount(),
                 "REQUEST_PAYMENT",
                 "SUCCESS",
-                req.getNote(),
-                "REQ:" + req.getRequestId()
+                req.getNote()
         );
 
         moneyRequestDao.updateStatus(req.getRequestId(), "ACCEPTED");
@@ -242,17 +227,15 @@ public class MoneyRequestService {
                 req.getFromUserId(),
                 "REQUEST",
                 "Request Accepted",
-                "Your request #" + req.getRequestId() + " was accepted. Amount $" + req.getAmount()
+                "Your request #" + req.getRequestId() + " was accepted. Amount ₹" + req.getAmount()
         );
 
         System.out.println("[INFO] Request accepted and payment completed.");
         ConsoleUtil.pause(sc);
     }
 
-    // ========================
-    // DECLINE REQUEST (incoming)
-    // ========================
     public void declineRequest(Scanner sc, User payer) {
+
         ConsoleUtil.printHeader("Decline Request");
 
         List<MoneyRequest> list = moneyRequestDao.findIncoming(payer.getUserId());
@@ -268,7 +251,7 @@ public class MoneyRequestService {
                 anyPending = true;
                 System.out.println("ID: " + r.getRequestId()
                         + " | From(UserId): " + r.getFromUserId()
-                        + " | Amount: $" + r.getAmount());
+                        + " | Amount: ₹" + r.getAmount());
             }
         }
 
@@ -309,10 +292,8 @@ public class MoneyRequestService {
         ConsoleUtil.pause(sc);
     }
 
-    // ========================
-    // CANCEL OUTGOING REQUEST (requester cancels)
-    // ========================
     public void cancelRequest(Scanner sc, User user) {
+
         ConsoleUtil.printHeader("Cancel Outgoing Request");
 
         List<MoneyRequest> list = moneyRequestDao.findOutgoing(user.getUserId());
@@ -328,7 +309,7 @@ public class MoneyRequestService {
                 anyPending = true;
                 System.out.println("ID: " + r.getRequestId()
                         + " | To(UserId): " + r.getToUserId()
-                        + " | Amount: $" + r.getAmount());
+                        + " | Amount: ₹" + r.getAmount());
             }
         }
 

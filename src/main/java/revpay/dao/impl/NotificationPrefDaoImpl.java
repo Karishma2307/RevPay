@@ -48,8 +48,7 @@ public class NotificationPrefDaoImpl implements NotificationPrefDao {
     public boolean isEnabled(long userId, String type) {
         ensureExists(userId);
         String col = columnForType(type);
-        if (col == null) return true; // unknown types allowed by default
-
+        if (col == null) return true; 
         String sql = "SELECT " + col + " AS FLAG FROM NOTIFICATION_PREFS WHERE USER_ID = ?";
 
         try (Connection con = DBConnection.getConnection();
@@ -86,7 +85,7 @@ public class NotificationPrefDaoImpl implements NotificationPrefDao {
         return 500;
     }
 
-    // ✅ anti-spam: send alert only if last alert was null OR older than 10 minutes
+    
     @Override
     public boolean shouldSendLowBalanceAlert(long userId) {
         ensureExists(userId);
@@ -102,7 +101,7 @@ public class NotificationPrefDaoImpl implements NotificationPrefDao {
                     if (last == null) return true;
 
                     long diffMs = System.currentTimeMillis() - last.getTime();
-                    return diffMs > (10 * 60 * 1000); // 10 minutes
+                    return diffMs > (10 * 60 * 1000); 
                 }
             }
         } catch (Exception e) {

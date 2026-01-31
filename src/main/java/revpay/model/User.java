@@ -3,15 +3,15 @@ package revpay.model;
 public class User {
 
     private long userId;
-    private String accountId;    // P-xxxxx or B-xxxxx
-    private String accountType;  // PERSONAL / BUSINESS
+    private String accountId;    
+    private String accountType;  
     private String fullName;
     private String username;
     private String email;
     private String phone;
     private String passwordHash;
     private String txnPinHash;
-    private String status;           // ACTIVE / LOCKED
+    private String status;           
     private int failedLoginAttempts;
 
     public long getUserId() {

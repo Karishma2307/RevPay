@@ -4,10 +4,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-public class DBConnection {
+public class DbUtil {
 
-   
-    private static final String URL  = "jdbc:oracle:thin:@localhost:1521:XE";
+    private static final String URL = "jdbc:oracle:thin:@localhost:1521:XE";
     private static final String USER = "system";
     private static final String PASS = "system";
 
@@ -15,8 +14,7 @@ public class DBConnection {
         try {
             Class.forName("oracle.jdbc.driver.OracleDriver");
         } catch (ClassNotFoundException e) {
-            System.out.println("[ERROR] Oracle JDBC Driver not found.");
-            e.printStackTrace();
+            throw new RuntimeException("Oracle JDBC Driver not found.", e);
         }
     }
 

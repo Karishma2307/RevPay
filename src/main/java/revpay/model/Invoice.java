@@ -11,7 +11,7 @@ public class Invoice {
     private String customerPhone;
     private Date dueDate;
     private double totalAmount;
-    private String status; // PENDING, PAID, CANCELLED
+    private String status; 
     private Date createdAt;
     private Date updatedAt;
 

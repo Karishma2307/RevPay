@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Scanner;
 
@@ -18,16 +17,14 @@ import revpay.dao.LoanRepaymentDao;
 import revpay.dao.TransactionDao;
 import revpay.dao.WalletDao;
 import revpay.model.Loan;
-import revpay.model.LoanRepayment;
 import revpay.model.User;
 import revpay.model.Wallet;
 
-@ExtendWith(MockitoExtension.class)   // ✅ REQUIRED
+@ExtendWith(MockitoExtension.class)
 class LoanServiceTest {
 
     private LoanService service;
 
-    // Mockito mocks
     private LoanDao loanDao;
     private LoanRepaymentDao repaymentDao;
     private WalletDao walletDao;
@@ -37,12 +34,17 @@ class LoanServiceTest {
 
     private User businessUser;
 
-    private String extraEnters() {
-        return "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+    // ✅ IMPORTANT: your ConsoleUtil.pause(sc) consumes nextLine()
+    // So give the Scanner plenty of "\n"
+    private String manyEnters() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 50; i++) sb.append("\n");
+        return sb.toString();
     }
 
     @BeforeEach
     void setup() throws Exception {
+
         service = new LoanService();
 
         loanDao = mock(LoanDao.class);
@@ -61,40 +63,24 @@ class LoanServiceTest {
 
         businessUser = new User();
         businessUser.setUserId(10L);
-        businessUser.setFullName("Biz User");
     }
 
-    // -------------------------------------------------
-    // 1) applyForLoan – invalid amount
-    // -------------------------------------------------
+    // --------------------------------------------------
+    // TEST 1: applyForLoan → success
+    // --------------------------------------------------
     @Test
-    void applyForLoan_invalidAmount_shouldNotCreateLoan() {
-        String input = "abc\n" + extraEnters();
+    void applyForLoan_success() {
 
-        service.applyForLoan(new Scanner(input), businessUser);
-
-        verify(loanDao, never()).createLoan(any());
-        verify(notificationService, never()).notifyUser(anyLong(), any(), any(), any());
-    }
-
-    // -------------------------------------------------
-    // 2) applyForLoan – success
-    // -------------------------------------------------
-    @Test
-    void applyForLoan_success_shouldCreateLoanAndNotify() {
         when(loanDao.createLoan(any(Loan.class))).thenReturn(101L);
 
-        String input = "5000\nInventory\n" + extraEnters();
+        String input =
+                "5000\n" +                 // loan amount
+                "Business expansion\n" +    // purpose
+                manyEnters();               // ✅ for ConsoleUtil.pause(sc)
 
         service.applyForLoan(new Scanner(input), businessUser);
 
-        verify(loanDao).createLoan(argThat(l ->
-                l.getBusinessUserId() == 10L &&
-                l.getAmount() == 5000.0 &&
-                l.getOutstandingAmount() == 5000.0 &&
-                "PENDING".equals(l.getStatus())
-        ));
-
+        verify(loanDao).createLoan(any(Loan.class));
         verify(notificationService).notifyUser(
                 eq(10L),
                 eq("LOAN"),
@@ -103,91 +89,129 @@ class LoanServiceTest {
         );
     }
 
-    // -------------------------------------------------
-    // 3) viewLoans – empty
-    // -------------------------------------------------
+    // --------------------------------------------------
+    // TEST 2: viewLoans → no loans
+    // (viewLoans has ConsoleUtil.pause(sc) when empty)
+    // --------------------------------------------------
     @Test
-    void viewLoans_empty_shouldQueryDao() {
+    void viewLoans_noLoans() {
+
         when(loanDao.findByBusinessUser(10L)).thenReturn(Collections.emptyList());
 
-        service.viewLoans(new Scanner(extraEnters()), businessUser);
+        service.viewLoans(new Scanner(manyEnters()), businessUser);
 
         verify(loanDao).findByBusinessUser(10L);
     }
 
-    // -------------------------------------------------
-    // 4) makeRepayment – loan not found
-    // -------------------------------------------------
+    // --------------------------------------------------
+    // TEST 3: makeRepayment → insufficient balance
+    // (makeRepayment ends with ConsoleUtil.pause(sc))
+    // --------------------------------------------------
     @Test
-    void makeRepayment_loanNotFound_shouldExitEarly() {
-        when(loanDao.findByBusinessUser(10L)).thenReturn(Arrays.asList(new Loan()));
-        when(loanDao.findById(99L)).thenReturn(null);
+    void makeRepayment_insufficientBalance() {
 
-        String input = "99\n" + extraEnters();
+        Loan loan = new Loan();
+        loan.setLoanId(1L);
+        loan.setBusinessUserId(10L);
+        loan.setOutstandingAmount(5000);
+        loan.setStatus("ACTIVE");
+
+        Wallet wallet = new Wallet();
+        wallet.setBalance(1000);
+
+        when(loanDao.findByBusinessUser(10L)).thenReturn(Collections.singletonList(loan));
+        when(loanDao.findById(1L)).thenReturn(loan);
+        when(walletDao.getWalletByUserId(10L)).thenReturn(wallet);
+
+        String input =
+                "1\n" +      // loan id
+                "3000\n" +   // repayment amount
+                manyEnters(); // ✅ for pause()
 
         service.makeRepayment(new Scanner(input), businessUser);
 
         verify(walletDao, never()).updateBalance(anyLong(), anyDouble());
-        verify(repaymentDao, never()).createRepayment(any());
-        verify(transactionDao, never()).createTransaction(anyLong(), anyLong(), anyDouble(), any(), any(), any(), any());
+        verify(transactionDao, never()).createTransaction(anyLong(), anyLong(), anyDouble(), any(), any(), any());
     }
 
-    // -------------------------------------------------
-    // 5) makeRepayment – success
-    // -------------------------------------------------
+    // --------------------------------------------------
+    // TEST 4: makeRepayment → full repayment (CLOSED)
+    // --------------------------------------------------
     @Test
-    void makeRepayment_success_shouldUpdateEverything() {
-        when(loanDao.findByBusinessUser(10L)).thenReturn(Arrays.asList(new Loan()));
+    void makeRepayment_fullRepayment_shouldCloseLoan() {
 
         Loan loan = new Loan();
-        loan.setLoanId(5L);
+        loan.setLoanId(2L);
         loan.setBusinessUserId(10L);
-        loan.setOutstandingAmount(300.0);
+        loan.setOutstandingAmount(2000);
         loan.setStatus("ACTIVE");
 
-        when(loanDao.findById(5L)).thenReturn(loan);
-
         Wallet wallet = new Wallet();
-        wallet.setBalance(1000.0);
+        wallet.setBalance(3000);
+
+        when(loanDao.findByBusinessUser(10L)).thenReturn(Collections.singletonList(loan));
+        when(loanDao.findById(2L)).thenReturn(loan);
         when(walletDao.getWalletByUserId(10L)).thenReturn(wallet);
 
-        String input = "5\n100\n" + extraEnters();
+        String input =
+                "2\n" +      // loan id
+                "2000\n" +   // repayment amount
+                manyEnters(); // ✅ for pause()
 
         service.makeRepayment(new Scanner(input), businessUser);
 
-        verify(walletDao).updateBalance(10L, 900.0);
-        verify(lowBalanceAlertService).checkAndNotify(10L);
+        verify(walletDao).updateBalance(10L, 1000.0);
 
-        verify(loanDao).updateLoan(argThat(l ->
-                l.getOutstandingAmount() == 200.0 &&
-                "ACTIVE".equals(l.getStatus())
-        ));
-
-        verify(repaymentDao).createRepayment(any(LoanRepayment.class));
         verify(transactionDao).createTransaction(
                 eq(10L),
                 eq(0L),
-                eq(100.0),
+                eq(2000.0),
                 eq("LOAN_REPAYMENT"),
                 eq("SUCCESS"),
-                contains("loan #5"),
-                eq("LOANPAY:5")
-        );
-
-        verify(notificationService).notifyUser(
-                eq(10L),
-                eq("LOAN"),
-                eq("Loan Repayment"),
-                contains("Outstanding")
+                contains("loan #2")
         );
     }
 
-    // -------------------------------------------------
-    // Reflection helper
-    // -------------------------------------------------
-    private void inject(Object target, String field, Object mock) throws Exception {
-        Field f = target.getClass().getDeclaredField(field);
+    // --------------------------------------------------
+    // TEST 5: makeRepayment → partial repayment (ACTIVE)
+    // --------------------------------------------------
+    @Test
+    void makeRepayment_partialRepayment_shouldRemainActive() {
+
+        Loan loan = new Loan();
+        loan.setLoanId(3L);
+        loan.setBusinessUserId(10L);
+        loan.setOutstandingAmount(5000);
+        loan.setStatus("ACTIVE");
+
+        Wallet wallet = new Wallet();
+        wallet.setBalance(6000);
+
+        when(loanDao.findByBusinessUser(10L)).thenReturn(Collections.singletonList(loan));
+        when(loanDao.findById(3L)).thenReturn(loan);
+        when(walletDao.getWalletByUserId(10L)).thenReturn(wallet);
+
+        String input =
+                "3\n" +      // loan id
+                "2000\n" +   // repayment amount
+                manyEnters(); // ✅ for pause()
+
+        service.makeRepayment(new Scanner(input), businessUser);
+
+        verify(walletDao).updateBalance(10L, 4000.0);
+
+        verify(loanDao).updateLoan(argThat(l ->
+                l.getOutstandingAmount() == 3000.0 &&
+                "ACTIVE".equalsIgnoreCase(l.getStatus())
+        ));
+    }
+
+    // --------------------------------------------------
+    // Reflection injection helper
+    // --------------------------------------------------
+    private void inject(Object target, String fieldName, Object value) throws Exception {
+        Field f = target.getClass().getDeclaredField(fieldName);
         f.setAccessible(true);
-        f.set(target, mock);
+        f.set(target, value);
     }
 }

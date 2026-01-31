@@ -13,9 +13,7 @@ public class SecurityService {
 
     private final UserDao userDao = new UserDaoImpl();
 
-    // ==========================
-    // CHANGE PASSWORD
-    // ==========================
+    
     public void changePassword(Scanner sc, User user) {
         ConsoleUtil.printHeader("Change Password");
 
@@ -68,9 +66,6 @@ public class SecurityService {
         ConsoleUtil.pause(sc);
     }
 
-    // ==========================
-    // CHANGE TRANSACTION PIN
-    // ==========================
     public void changeTxnPin(Scanner sc, User user) {
         ConsoleUtil.printHeader("Change Transaction PIN");
 

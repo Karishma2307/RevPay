@@ -24,11 +24,8 @@ public class LoanService {
     private final WalletDao walletDao = new WalletDaoImpl();
     private final TransactionDao transactionDao = new TransactionDaoImpl();
     private final NotificationService notificationService = new NotificationService();
-
-    // ✅ Step 5: low balance alerts
     private final LowBalanceAlertService lowBalanceAlertService = new LowBalanceAlertService();
 
-    // Wrappers for BusinessMenu
     public void applyLoan(Scanner sc, User businessUser) {
         applyForLoan(sc, businessUser);
     }
@@ -37,8 +34,8 @@ public class LoanService {
         makeRepayment(sc, businessUser);
     }
 
-    // ===== Apply
     public void applyForLoan(Scanner sc, User businessUser) {
+
         ConsoleUtil.printHeader("Apply for Business Loan");
 
         System.out.print("Loan Amount: ");
@@ -64,18 +61,22 @@ public class LoanService {
 
         long loanId = loanDao.createLoan(loan);
 
-        notificationService.notifyUser(businessUser.getUserId(), "LOAN", "Loan Applied",
-                "Loan #" + loanId + " applied for $" + amount);
+        notificationService.notifyUser(
+                businessUser.getUserId(),
+                "LOAN",
+                "Loan Applied",
+                "Loan #" + loanId + " applied for ₹" + amount
+        );
 
         System.out.println("[INFO] Loan application created. Loan ID: " + loanId + " (Status: PENDING)");
         ConsoleUtil.pause(sc);
     }
 
-    // ===== View
     public void viewLoans(Scanner sc, User businessUser) {
-        ConsoleUtil.printHeader("My Loans");
-        List<Loan> loans = loanDao.findByBusinessUser(businessUser.getUserId());
 
+        ConsoleUtil.printHeader("My Loans");
+
+        List<Loan> loans = loanDao.findByBusinessUser(businessUser.getUserId());
         if (loans == null || loans.isEmpty()) {
             System.out.println("No loans found.");
             ConsoleUtil.pause(sc);
@@ -84,19 +85,24 @@ public class LoanService {
 
         System.out.println("ID | Amount | Outstanding | Status | Purpose");
         System.out.println("---------------------------------------------");
+
         for (Loan l : loans) {
             System.out.printf("%d | %.2f | %.2f | %s | %s%n",
-                    l.getLoanId(), l.getAmount(), l.getOutstandingAmount(), l.getStatus(), l.getPurpose());
+                    l.getLoanId(),
+                    l.getAmount(),
+                    l.getOutstandingAmount(),
+                    l.getStatus(),
+                    l.getPurpose());
         }
-        // do NOT pause here because repayment flow calls viewLoans then continues
     }
 
-    // ===== Repay
     public void makeRepayment(Scanner sc, User businessUser) {
+
         ConsoleUtil.printHeader("Loan Repayment");
 
         viewLoans(sc, businessUser);
         System.out.println();
+
         System.out.print("Enter Loan ID to repay: ");
         long loanId;
         try { loanId = Long.parseLong(sc.nextLine()); }
@@ -142,15 +148,11 @@ public class LoanService {
         double newWalletBal = wallet.getBalance() - pay;
         walletDao.updateBalance(businessUser.getUserId(), newWalletBal);
 
-        // ✅ Step 5: low balance alert after deduction
-        lowBalanceAlertService.checkAndNotify(businessUser.getUserId());
+        try { lowBalanceAlertService.checkAndNotify(businessUser.getUserId()); } catch (Exception ignored) {}
 
         double newOutstanding = Math.max(0, loan.getOutstandingAmount() - pay);
         loan.setOutstandingAmount(newOutstanding);
-
-        if (newOutstanding == 0) loan.setStatus("CLOSED");
-        else loan.setStatus("ACTIVE");
-
+        loan.setStatus(newOutstanding == 0 ? "CLOSED" : "ACTIVE");
         loanDao.updateLoan(loan);
 
         LoanRepayment r = new LoanRepayment();
@@ -159,18 +161,22 @@ public class LoanService {
         r.setStatus("SUCCESS");
         repaymentDao.createRepayment(r);
 
+        // ✅ FIXED: 6 params only
         transactionDao.createTransaction(
                 businessUser.getUserId(),
                 0L,
                 pay,
                 "LOAN_REPAYMENT",
                 "SUCCESS",
-                "Loan repayment for loan #" + loanId,
-                "LOANPAY:" + loanId
+                "Loan repayment for loan #" + loanId
         );
 
-        notificationService.notifyUser(businessUser.getUserId(), "LOAN", "Loan Repayment",
-                "Paid $" + pay + " for Loan #" + loanId + ". Outstanding: $" + newOutstanding);
+        notificationService.notifyUser(
+                businessUser.getUserId(),
+                "LOAN",
+                "Loan Repayment",
+                "Paid ₹" + pay + " for Loan #" + loanId + ". Outstanding: ₹" + newOutstanding
+        );
 
         System.out.println("[INFO] Repayment successful. New wallet balance: " + newWalletBal);
         System.out.println("[INFO] Outstanding amount: " + newOutstanding + " | Status: " + loan.getStatus());

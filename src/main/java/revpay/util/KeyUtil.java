@@ -4,10 +4,8 @@ import java.util.Base64;
 
 public class KeyUtil {
 
-    // Set environment variable: REVPAY_AES_KEY_B64 = base64(32 bytes)
-    // For demo fallback (NOT secure in real life)
     private static final String FALLBACK_B64 =
-            "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="; // 32 bytes base64
+            "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="; 
 
     public static byte[] getAes256Key() {
         String b64 = System.getenv("REVPAY_AES_KEY_B64");

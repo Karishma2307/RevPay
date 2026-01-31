@@ -17,5 +17,6 @@ public class Main {
 		MainMenu mainMenu = new MainMenu(sc);
 		mainMenu.show();
 		sc.close();
+		
 	}
-}
+} 

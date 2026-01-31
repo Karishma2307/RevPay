@@ -33,7 +33,7 @@ public class UserSecurityAnswerDaoImpl implements UserSecurityAnswerDao {
     }
 
     public List<SecurityQuestion> getQuestionsForUser(long userId) {
-        // returns the questions that user has answers for
+       
         String sql = "SELECT q.Q_ID, q.QUESTION "
                    + "FROM SECURITY_QUESTIONS q "
                    + "JOIN USER_SECURITY_ANSWERS a ON a.Q_ID = q.Q_ID "

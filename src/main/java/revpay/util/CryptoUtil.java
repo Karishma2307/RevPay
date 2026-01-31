@@ -42,7 +42,7 @@ public class CryptoUtil {
 
             byte[] cipherBytes = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
 
-            // store: Base64(IV) + ":" + Base64(cipher)
+            
             return Base64.getEncoder().encodeToString(iv) + ":" +
                     Base64.getEncoder().encodeToString(cipherBytes);
         } catch (Exception e) {

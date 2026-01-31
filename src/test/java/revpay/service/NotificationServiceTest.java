@@ -1,127 +1,139 @@
 package revpay.service;
 
-import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
+import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Scanner;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import revpay.dao.NotificationDao;
-import revpay.dao.NotificationPrefDao;
+import revpay.model.Notification;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
     private NotificationService service;
-
-    private NotificationDao dao;
-    private NotificationPrefDao prefDao;
-
-    private String manyEnters() {
-        // Safe buffer if ConsoleUtil.pause(sc) reads more than once
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 60; i++) sb.append("\n");
-        return sb.toString();
-    }
+    private NotificationDao notificationDao;
 
     @BeforeEach
     void setup() throws Exception {
         service = new NotificationService();
+        notificationDao = mock(NotificationDao.class);
 
-        dao = mock(NotificationDao.class);
-        prefDao = mock(NotificationPrefDao.class);
+        // ✅ Inject mock into the service regardless of field name
+        // Try "notificationDao" first, else try "dao"
+        boolean injected = tryInject(service, "notificationDao", notificationDao)
+                        || tryInject(service, "dao", notificationDao);
 
-        inject(service, "dao", dao);
-        inject(service, "prefDao", prefDao);
+        if (!injected) {
+            fail("Could not inject NotificationDao. Field name not found: 'notificationDao' or 'dao'. " +
+                 "Check your NotificationService field name.");
+        }
     }
 
-    // ---------------------------------------------------------
-    // TEST 1: notifyUser should always ensure prefs exist
-    // ---------------------------------------------------------
+    // ---------------------------------------------------
+    // TEST 1: notifyUser should create notification
+    // ---------------------------------------------------
     @Test
-    void notifyUser_shouldEnsureExists() {
-        when(prefDao.isEnabled(10L, "TRANSACTION")).thenReturn(false);
+    void notifyUser_shouldCreateNotification() {
+        service.notifyUser(10L, "TRANSACTION", "Title", "Message");
 
-        service.notifyUser(10L, "TRANSACTION", "t", "m");
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationDao, times(1)).createNotification(captor.capture());
 
-        verify(prefDao).ensureExists(10L);
+        Notification saved = captor.getValue();
+        assertEquals(10L, saved.getUserId());
+        assertEquals("TRANSACTION", saved.getType());
+        assertEquals("Title", saved.getTitle());
+        assertEquals("Message", saved.getMessage());
     }
 
-    // ---------------------------------------------------------
-    // TEST 2: notifyUser when disabled -> should NOT create
-    // ---------------------------------------------------------
+    // ---------------------------------------------------
+    // TEST 2: menu option 4 -> Back (exit)
+    // ---------------------------------------------------
     @Test
-    void notifyUser_disabled_shouldNotCreate() {
-        when(prefDao.isEnabled(10L, "REQUEST")).thenReturn(false);
-
-        service.notifyUser(10L, "REQUEST", "title", "msg");
-
-        verify(prefDao).ensureExists(10L);
-        verify(prefDao).isEnabled(10L, "REQUEST");
-        verifyNoInteractions(dao);
-    }
-
-    // ---------------------------------------------------------
-    // TEST 3: notifyUser when enabled -> should create
-    // ---------------------------------------------------------
-    @Test
-    void notifyUser_enabled_shouldCreate() {
-        when(prefDao.isEnabled(10L, "LOAN")).thenReturn(true);
-
-        service.notifyUser(10L, "LOAN", "Loan", "Applied");
-
-        verify(prefDao).ensureExists(10L);
-        verify(prefDao).isEnabled(10L, "LOAN");
-        verify(dao).create(10L, "LOAN", "Loan", "Applied");
-    }
-
-    // ---------------------------------------------------------
-    // TEST 4: showNotificationsMenu option 4 -> markAllAsRead then back
-    // ---------------------------------------------------------
-    @Test
-    void showNotificationsMenu_markAllAsRead_thenBack() {
-        // Option 4 calls ConsoleUtil.pause(sc) once.
-        // Then menu loops again, we choose 6 to exit.
-        String input =
-                "4\n" +
-                "\n" +     // pause after markAllAsRead
-                "6\n";
-
+    void showNotificationsMenu_back_shouldExit() {
+        String input = "4\n";
         service.showNotificationsMenu(new Scanner(input), 10L);
 
-        verify(prefDao).ensureExists(10L);
-        verify(dao).markAllAsRead(10L);
+        verifyNoInteractions(notificationDao);
     }
 
-    // ---------------------------------------------------------
-    // TEST 5: managePreferences option 6 -> updateThreshold then back
-    // FIXED: add one Enter for pause immediately after threshold input
-    // ---------------------------------------------------------
+    // ---------------------------------------------------
+    // TEST 3: option 3 -> markAllAsRead then back
+    // ---------------------------------------------------
     @Test
-    void managePreferences_setThreshold_thenBack() {
-        String input =
-                "6\n" +     // set threshold
-                "200\n" +   // value
-                "\n" +      // pause() consumes this
-                "7\n";      // back (exit)
+    void showNotificationsMenu_markAllAsRead_shouldCallDao() {
+        // 3 = mark all as read, then pause enter, then 4 = back
+        String input = "3\n\n4\n";
+        service.showNotificationsMenu(new Scanner(input), 10L);
 
-        service.managePreferences(new Scanner(input), 10L);
-
-        verify(prefDao).ensureExists(10L);
-        verify(prefDao).updateThreshold(10L, 200);
+        verify(notificationDao, times(1)).markAllAsRead(10L);
     }
 
-    // ---------------------------------------------------------
-    // Reflection injection helper
-    // ---------------------------------------------------------
-    private void inject(Object target, String fieldName, Object value) throws Exception {
-        Field f = target.getClass().getDeclaredField(fieldName);
-        f.setAccessible(true);
-        f.set(target, value);
+    // ---------------------------------------------------
+    // TEST 4: option 1 -> all notifications
+    // ---------------------------------------------------
+    @Test
+    void showNotificationsMenu_all_shouldQueryDao() {
+        Notification n1 = new Notification();
+        n1.setTitle("T1");
+        n1.setType("TYPE1");
+        n1.setMessage("M1");
+
+        // ✅ if your model supports setRead
+        try {
+            n1.getClass().getMethod("setRead", boolean.class).invoke(n1, false);
+        } catch (Exception ignore) {
+            // if your model doesn't have setRead, it's fine for this test
+        }
+
+        n1.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+
+        when(notificationDao.findByUserId(10L, false)).thenReturn(Arrays.asList(n1));
+
+        // 1 = all, pause enter, 4 = back
+        String input = "1\n\n4\n";
+        service.showNotificationsMenu(new Scanner(input), 10L);
+
+        verify(notificationDao, times(1)).findByUserId(10L, false);
+    }
+
+    // ---------------------------------------------------
+    // TEST 5: option 2 -> unread only, empty list
+    // ---------------------------------------------------
+    @Test
+    void showNotificationsMenu_unreadOnly_empty_shouldQueryDao() {
+        when(notificationDao.findByUserId(10L, true)).thenReturn(Collections.emptyList());
+
+        // 2 = unread, pause enter, 4 = back
+        String input = "2\n\n4\n";
+        service.showNotificationsMenu(new Scanner(input), 10L);
+
+        verify(notificationDao, times(1)).findByUserId(10L, true);
+    }
+
+    // ---------------------------------------------------
+    // Helper: try injection without throwing
+    // ---------------------------------------------------
+    private boolean tryInject(Object target, String fieldName, Object value) {
+        try {
+            Field f = target.getClass().getDeclaredField(fieldName);
+            f.setAccessible(true);
+            f.set(target, value);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

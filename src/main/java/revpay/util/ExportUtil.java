@@ -11,33 +11,44 @@ public class ExportUtil {
 
     public static String exportTransactionsToCsv(List<Transaction> txs, String filePrefix) {
         FileWriter fw = null;
+
         try {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
             String file = filePrefix + "_" + ts + ".csv";
 
             fw = new FileWriter(file);
-            fw.write("TXN_ID,FROM_USER_ID,TO_USER_ID,AMOUNT,TYPE,STATUS,NOTE,REF_ID,CREATED_AT\n");
+
+          
+            fw.write("TXN_ID,FROM_USER_ID,TO_USER_ID,AMOUNT,CURRENCY,TYPE,STATUS,NOTE,CREATED_AT\n");
 
             for (Transaction t : txs) {
-                fw.write(s(t.getTransactionId()) + ","
+                fw.write(
+                        s(t.getTransactionId()) + ","
                         + s(t.getFromUserId()) + ","
                         + s(t.getToUserId()) + ","
                         + s(String.format("%.2f", t.getAmount())) + ","
+                        + s(t.getCurrency()) + ","
                         + s(t.getType()) + ","
                         + s(t.getStatus()) + ","
                         + s(clean(t.getNote())) + ","
-                        + s(t.getRefId()) + ","
-                        + s(t.getCreatedAt()) + "\n");
+                        + s(t.getCreatedAt()) + "\n"
+                );
             }
+
             fw.flush();
             return file;
 
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("[ERROR] Export failed.");
+            System.out.println("[DEV] " + e.getMessage());
             return null;
 
         } finally {
-            try { if (fw != null) fw.close(); } catch (Exception e) {}
+            try {
+                if (fw != null) fw.close();
+            } catch (Exception e) {
+                
+            }
         }
     }
 

@@ -31,9 +31,7 @@ public class AuthService {
         this.sc = sc;
     }
 
-    // =======================
-    // REGISTRATION
-    // =======================
+    
     public User register() {
         ConsoleUtil.printHeader("Registration");
         logger.info("Registration flow started");
@@ -57,7 +55,7 @@ public class AuthService {
         User user = new User();
         user.setAccountType(accountType);
 
-        // Full name
+       
         System.out.print("Full Name : ");
         String fullName = sc.nextLine();
         if (!ValidationUtil.isNonEmpty(fullName)) {
@@ -68,7 +66,7 @@ public class AuthService {
         }
         user.setFullName(fullName.trim());
 
-        // Username (unique)
+       
         System.out.print("Username  : ");
         String username = sc.nextLine();
         if (!ValidationUtil.isNonEmpty(username)) {
@@ -86,7 +84,7 @@ public class AuthService {
         }
         user.setUsername(username.trim());
 
-        // Email (unique)
+       
         System.out.print("Email     : ");
         String email = sc.nextLine();
         if (!ValidationUtil.isValidEmail(email)) {
@@ -103,7 +101,7 @@ public class AuthService {
         }
         user.setEmail(email.trim());
 
-        // Phone (unique)
+       
         System.out.print("Phone     : ");
         String phone = sc.nextLine();
         if (!ValidationUtil.isValidPhone(phone)) {
@@ -120,7 +118,7 @@ public class AuthService {
         }
         user.setPhone(phone.trim());
 
-        // Password (DO NOT LOG password)
+        
         System.out.print("Password  : ");
         String pw1 = sc.nextLine();
         System.out.print("Confirm Password: ");
@@ -142,7 +140,7 @@ public class AuthService {
         }
         user.setPasswordHash(HashUtil.hash(pw1));
 
-        // Transaction PIN (DO NOT LOG pin)
+        
         System.out.print("Create 4-digit Transaction PIN: ");
         String pin = sc.nextLine();
         if (!ValidationUtil.isValidTxnPin(pin)) {
@@ -154,7 +152,7 @@ public class AuthService {
         }
         user.setTxnPinHash(HashUtil.hash(pin));
 
-        // Generate ACCOUNT_ID
+        
         String prefix = "PERSONAL".equals(accountType) ? "P-" : "B-";
         String accountId = null;
         int attempts = 0;
@@ -191,10 +189,10 @@ public class AuthService {
             logger.info("Wallet created for new userId={}", newId);
         } catch (Exception e) {
             logger.error("Registration warning: user created but wallet creation failed userId={}", newId, e);
-            // You can decide whether to rollback in future.
+           
         }
 
-        // If BUSINESS -> insert business profile details
+       
         if ("BUSINESS".equals(accountType)) {
             boolean ok = businessProfileService.collectAndSave(sc, newId);
             if (!ok) {
@@ -205,13 +203,13 @@ public class AuthService {
             }
         }
 
-        // Setup Security Questions
+        
         try {
             recoveryService.setupSecurityQuestions(sc, newId);
             logger.info("Security questions setup completed (userId={})", newId);
         } catch (Exception e) {
             logger.error("Security questions setup failed (userId={})", newId, e);
-            // Optional: still allow account creation; depends on your requirement.
+            
         }
 
         logger.info("{} account created successfully (userId={}, username='{}', accountId='{}')",
@@ -223,9 +221,7 @@ public class AuthService {
         return user;
     }
 
-    // =======================
-    // LOGIN
-    // =======================
+    
     public User login() {
         ConsoleUtil.printHeader("Login");
         logger.info("Login flow started");
@@ -283,7 +279,7 @@ public class AuthService {
         }
 
         System.out.print("Password: ");
-        String pw = sc.nextLine(); // DO NOT LOG
+        String pw = sc.nextLine(); 
 
         if (!HashUtil.check(pw, user.getPasswordHash())) {
             int newAttempts = user.getFailedLoginAttempts() + 1;
@@ -303,10 +299,10 @@ public class AuthService {
             return null;
         }
 
-        // Reset attempts
+      
         userDao.updateFailedAttempts(user.getUserId(), 0);
 
-        // Simulated 2FA (DO NOT LOG code)
+      
         String code = String.format("%06d", new Random().nextInt(1000000));
         System.out.println("[2FA] Security code (simulated): " + code);
         System.out.print("Enter security code: ");
@@ -325,9 +321,7 @@ public class AuthService {
         return user;
     }
 
-    // =======================
-    // FORGOT PASSWORD
-    // =======================
+    
     public void forgotPassword() {
         logger.info("Forgot password flow started");
         recoveryService.forgotPassword(sc);
