@@ -32,3 +32,14 @@
 2026-01-31 16:36:58,905 INFO  revpay.service.AuthService - Registration flow started
 2026-01-31 16:36:58,906 WARN  revpay.service.AuthService - Registration failed: invalid account type choice='9'
 2026-01-31 16:36:58,912 INFO  revpay.service.AuthService - Forgot password flow started
+2026-01-31 17:05:47,309 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 17:05:47,319 WARN  revpay.service.AuthService - Registration failed: username already taken username='karishma'
+2026-01-31 17:05:47,366 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 17:05:47,595 INFO  revpay.service.AuthService - Wallet created for new userId=101
+2026-01-31 17:05:47,602 INFO  revpay.service.AuthService - Security questions setup completed (userId=101)
+2026-01-31 17:05:47,603 INFO  revpay.service.AuthService - PERSONAL account created successfully (userId=101, username='karishma', accountId='P-447594')
+2026-01-31 17:05:47,721 INFO  revpay.service.AuthService - Login flow started
+2026-01-31 17:05:47,830 WARN  revpay.service.AuthService - Account locked due to failed login attempts (userId=50, username='karishma', attempts=3)
+2026-01-31 17:05:47,839 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 17:05:47,839 WARN  revpay.service.AuthService - Registration failed: invalid account type choice='9'
+2026-01-31 17:05:47,848 INFO  revpay.service.AuthService - Forgot password flow started

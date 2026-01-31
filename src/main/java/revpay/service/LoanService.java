@@ -161,7 +161,7 @@ public class LoanService {
         r.setStatus("SUCCESS");
         repaymentDao.createRepayment(r);
 
-        // ✅ FIXED: 6 params only
+      
         transactionDao.createTransaction(
                 businessUser.getUserId(),
                 0L,
