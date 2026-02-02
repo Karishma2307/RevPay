@@ -42,7 +42,7 @@ public class BusinessMenu {
             
             if (session.isExpired()) {
                 ConsoleUtil.printHeader("Session Timeout");
-                System.out.println("[INFO] You were logged out due to inactivity.");
+                System.out.println("You were logged out due to inactivity.");
                 ConsoleUtil.pause(sc);
                 return;
             }
@@ -106,7 +106,7 @@ public class BusinessMenu {
 
                 case 8:
                     
-                    txHistoryService.showHistory(user, sc); // <-- if your service has different name, see note below
+                    txHistoryService.showHistory(user, sc); 
                     session.touch();
                     break;
 
@@ -121,12 +121,12 @@ public class BusinessMenu {
                     break;
 
                 case 11:
-                    System.out.println("[INFO] Logged out.");
+                    System.out.println("Logged out.");
                     ConsoleUtil.pause(sc);
                     return;
 
                 default:
-                    System.out.println("[ERROR] Invalid option.");
+                    System.out.println("Invalid option.🫥😐");
                     ConsoleUtil.pause(sc);
             }
         }

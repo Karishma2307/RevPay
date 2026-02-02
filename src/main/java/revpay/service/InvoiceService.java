@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import revpay.dao.InvoiceDao;
 import revpay.dao.InvoiceItemDao;
 import revpay.dao.TransactionDao;
@@ -21,6 +24,8 @@ import revpay.model.Wallet;
 import revpay.util.ConsoleUtil;
 
 public class InvoiceService {
+
+    private static final Logger logger = LoggerFactory.getLogger(InvoiceService.class);
 
     private final InvoiceDao invoiceDao = new InvoiceDaoImpl();
     private final InvoiceItemDao invoiceItemDao = new InvoiceItemDaoImpl();
@@ -38,6 +43,16 @@ public class InvoiceService {
 
     public void createInvoice(Scanner sc, User businessUser) {
         ConsoleUtil.printHeader("Create Invoice");
+
+        if (businessUser == null) {
+            logger.warn("createInvoice called with null businessUser");
+            System.out.println("Invalid user.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        logger.info("Create invoice started (businessUserId={}, username='{}')",
+                businessUser.getUserId(), safe(businessUser.getUsername()));
 
         System.out.print("Customer Name : ");
         String customerName = sc.nextLine();
@@ -66,16 +81,30 @@ public class InvoiceService {
 
             System.out.print("  Quantity    : ");
             double qty;
-            try { qty = Double.parseDouble(sc.nextLine()); }
-            catch (Exception e) { System.out.println("[ERROR] Invalid quantity."); continue; }
+            try {
+                qty = Double.parseDouble(sc.nextLine());
+            } catch (Exception e) {
+                logger.warn("Invalid quantity entered while creating invoice (businessUserId={})",
+                        businessUser.getUserId());
+                System.out.println("Invalid quantity.");
+                continue;
+            }
 
             System.out.print("  Unit Price  : ");
             double up;
-            try { up = Double.parseDouble(sc.nextLine()); }
-            catch (Exception e) { System.out.println("[ERROR] Invalid unit price."); continue; }
+            try {
+                up = Double.parseDouble(sc.nextLine());
+            } catch (Exception e) {
+                logger.warn("Invalid unit price entered while creating invoice (businessUserId={})",
+                        businessUser.getUserId());
+                System.out.println("Invalid unit price.");
+                continue;
+            }
 
             if (qty <= 0 || up < 0) {
-                System.out.println("[ERROR] Quantity must be > 0 and Unit Price must be >= 0.");
+                logger.warn("Invalid item values qty={} unitPrice={} (businessUserId={})",
+                        qty, up, businessUser.getUserId());
+                System.out.println("Quantity must be > 0 and Unit Price must be >= 0.");
                 continue;
             }
 
@@ -92,7 +121,8 @@ public class InvoiceService {
         }
 
         if (items.isEmpty()) {
-            System.out.println("[ERROR] Invoice must have at least one line item.");
+            logger.warn("Invoice creation failed: no line items (businessUserId={})", businessUser.getUserId());
+            System.out.println("Invoice must have at least one line item.");
             ConsoleUtil.pause(sc);
             return;
         }
@@ -106,40 +136,91 @@ public class InvoiceService {
         inv.setTotalAmount(total);
         inv.setStatus("PENDING");
 
-        long id = invoiceDao.createInvoice(inv);
-        if (id <= 0) {
-            System.out.println("[ERROR] Failed to create invoice.");
+        long id;
+        try {
+            id = invoiceDao.createInvoice(inv);
+        } catch (Exception e) {
+            logger.error("Invoice creation failed: DAO exception while creating invoice (businessUserId={})",
+                    businessUser.getUserId(), e);
+            System.out.println("Failed to create invoice.");
             ConsoleUtil.pause(sc);
             return;
         }
 
-        for (InvoiceItem it : items) {
-            it.setInvoiceId(id);
-            invoiceItemDao.createItem(it);
+        if (id <= 0) {
+            logger.error("Invoice creation failed: createInvoice returned non-positive id (businessUserId={}, returnedId={})",
+                    businessUser.getUserId(), id);
+            System.out.println("Failed to create invoice.");
+            ConsoleUtil.pause(sc);
+            return;
         }
+
+        try {
+            for (InvoiceItem it : items) {
+                it.setInvoiceId(id);
+                invoiceItemDao.createItem(it);
+            }
+        } catch (Exception e) {
+            logger.error("Invoice items creation failed (invoiceId={}, businessUserId={})",
+                    id, businessUser.getUserId(), e);
+            System.out.println("Invoice created but failed to save line items.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        logger.info("Invoice created successfully (invoiceId={}, businessUserId={}, total={})",
+                id, businessUser.getUserId(), fmt(total));
 
         System.out.println("[INFO] Invoice created successfully.");
         System.out.println("Invoice ID   : " + id);
         System.out.printf("Total Amount : ₹%.2f%n", total);
         System.out.println("Status       : PENDING");
 
-        notificationService.notifyUser(
-                businessUser.getUserId(),
-                "INVOICE",
-                "Invoice Created",
-                "Invoice #" + id + " created for " + customerName + " (₹" + String.format("%.2f", total) + ")."
-        );
+        try {
+            notificationService.notifyUser(
+                    businessUser.getUserId(),
+                    "INVOICE",
+                    "Invoice Created",
+                    "Invoice #" + id + " created for " + customerName + " (₹" + String.format("%.2f", total) + ")."
+            );
+            logger.debug("Notification sent for invoice created (invoiceId={}, businessUserId={})",
+                    id, businessUser.getUserId());
+        } catch (Exception e) {
+            logger.error("Failed to send notification for invoice creation (invoiceId={}, businessUserId={})",
+                    id, businessUser.getUserId(), e);
+        }
 
         ConsoleUtil.pause(sc);
     }
 
     public void manageInvoices(Scanner sc, User businessUser) {
 
+        if (businessUser == null) {
+            logger.warn("manageInvoices called with null businessUser");
+            System.out.println("Invalid user.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        logger.info("Manage invoices opened (businessUserId={}, username='{}')",
+                businessUser.getUserId(), safe(businessUser.getUsername()));
+
         while (true) {
             ConsoleUtil.printHeader("Manage Invoices");
 
-            List<Invoice> list = invoiceDao.findByBusinessUser(businessUser.getUserId());
+            List<Invoice> list;
+            try {
+                list = invoiceDao.findByBusinessUser(businessUser.getUserId());
+            } catch (Exception e) {
+                logger.error("Failed to fetch invoices list (businessUserId={})",
+                        businessUser.getUserId(), e);
+                System.out.println("Unable to load invoices right now.");
+                ConsoleUtil.pause(sc);
+                return;
+            }
+
             if (list == null || list.isEmpty()) {
+                logger.info("No invoices found (businessUserId={})", businessUser.getUserId());
                 System.out.println("No invoices found.");
                 ConsoleUtil.pause(sc);
                 return;
@@ -165,37 +246,78 @@ public class InvoiceService {
             System.out.print("Choice: ");
             String ch = sc.nextLine();
 
-            if ("4".equals(ch)) break;
+            if ("4".equals(ch)) {
+                logger.info("Manage invoices closed (businessUserId={})", businessUser.getUserId());
+                break;
+            }
 
             System.out.print("Enter Invoice ID: ");
             long invoiceId;
-            try { invoiceId = Long.parseLong(sc.nextLine()); }
-            catch (Exception e) { System.out.println("[ERROR] Invalid invoice ID."); ConsoleUtil.pause(sc); continue; }
+            try {
+                invoiceId = Long.parseLong(sc.nextLine());
+            } catch (Exception e) {
+                logger.warn("Invalid invoice id input while managing invoices (businessUserId={})",
+                        businessUser.getUserId());
+                System.out.println("Invalid invoice ID.");
+                ConsoleUtil.pause(sc);
+                continue;
+            }
 
-            Invoice inv = invoiceDao.findById(invoiceId);
+            Invoice inv;
+            try {
+                inv = invoiceDao.findById(invoiceId);
+            } catch (Exception e) {
+                logger.error("DAO error while fetching invoice by id (invoiceId={}, businessUserId={})",
+                        invoiceId, businessUser.getUserId(), e);
+                System.out.println("Unable to fetch invoice.");
+                ConsoleUtil.pause(sc);
+                continue;
+            }
+
             if (inv == null || inv.getBusinessUserId() != businessUser.getUserId()) {
-                System.out.println("[ERROR] Invoice not found for this business account.");
+                logger.warn("Invoice not found for business user (invoiceId={}, businessUserId={})",
+                        invoiceId, businessUser.getUserId());
+                System.out.println("Invoice not found for this business account.");
                 ConsoleUtil.pause(sc);
                 continue;
             }
 
             if ("1".equals(ch)) {
                 viewInvoiceDetails(sc, inv);
+
             } else if ("2".equals(ch)) {
                 markInvoicePaid(sc, businessUser, inv);
+
             } else if ("3".equals(ch)) {
-                invoiceDao.updateStatus(inv.getInvoiceId(), "CANCELLED");
+                try {
+                    invoiceDao.updateStatus(inv.getInvoiceId(), "CANCELLED");
+                    logger.info("Invoice marked CANCELLED (invoiceId={}, businessUserId={})",
+                            inv.getInvoiceId(), businessUser.getUserId());
+                } catch (Exception e) {
+                    logger.error("Failed to cancel invoice (invoiceId={}, businessUserId={})",
+                            inv.getInvoiceId(), businessUser.getUserId(), e);
+                    System.out.println("Failed to cancel invoice.");
+                    ConsoleUtil.pause(sc);
+                    continue;
+                }
 
-                notificationService.notifyUser(
-                        businessUser.getUserId(),
-                        "INVOICE",
-                        "Invoice Cancelled",
-                        "Invoice #" + inv.getInvoiceId() + " cancelled."
-                );
+                try {
+                    notificationService.notifyUser(
+                            businessUser.getUserId(),
+                            "INVOICE",
+                            "Invoice Cancelled",
+                            "Invoice #" + inv.getInvoiceId() + " cancelled."
+                    );
+                } catch (Exception e) {
+                    logger.error("Failed to send cancel notification (invoiceId={}, businessUserId={})",
+                            inv.getInvoiceId(), businessUser.getUserId(), e);
+                }
 
-                System.out.println("[INFO] Invoice marked as CANCELLED.");
+                System.out.println("Invoice marked as CANCELLED.");
                 ConsoleUtil.pause(sc);
+
             } else {
+                logger.warn("Invalid manage invoices option '{}' (businessUserId={})", ch, businessUser.getUserId());
                 System.out.println("[ERROR] Invalid option.");
                 ConsoleUtil.pause(sc);
             }
@@ -205,6 +327,7 @@ public class InvoiceService {
     private void viewInvoiceDetails(Scanner sc, Invoice inv) {
 
         ConsoleUtil.printHeader("Invoice #" + inv.getInvoiceId());
+        logger.debug("Viewing invoice details (invoiceId={})", inv.getInvoiceId());
 
         System.out.println("Customer: " + inv.getCustomerName());
         System.out.println("Email   : " + inv.getCustomerEmail());
@@ -215,7 +338,16 @@ public class InvoiceService {
         System.out.printf("Total   : ₹%.2f%n", inv.getTotalAmount());
         System.out.println("--------------------------------------------------");
 
-        List<InvoiceItem> items = invoiceItemDao.findByInvoiceId(inv.getInvoiceId());
+        List<InvoiceItem> items;
+        try {
+            items = invoiceItemDao.findByInvoiceId(inv.getInvoiceId());
+        } catch (Exception e) {
+            logger.error("Failed to fetch invoice items (invoiceId={})", inv.getInvoiceId(), e);
+            System.out.println("Unable to load invoice items.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
         if (items == null || items.isEmpty()) {
             System.out.println("No items.");
         } else {
@@ -236,45 +368,97 @@ public class InvoiceService {
     private void markInvoicePaid(Scanner sc, User businessUser, Invoice inv) {
 
         if ("PAID".equalsIgnoreCase(inv.getStatus())) {
-            System.out.println("[INFO] Invoice already PAID.");
+            logger.info("Mark paid skipped: already PAID (invoiceId={}, businessUserId={})",
+                    inv.getInvoiceId(), businessUser.getUserId());
+            System.out.println("Invoice already PAID.");
             ConsoleUtil.pause(sc);
             return;
         }
         if ("CANCELLED".equalsIgnoreCase(inv.getStatus())) {
-            System.out.println("[INFO] Cannot pay a CANCELLED invoice.");
+            logger.warn("Mark paid blocked: invoice CANCELLED (invoiceId={}, businessUserId={})",
+                    inv.getInvoiceId(), businessUser.getUserId());
+            System.out.println("Cannot pay a CANCELLED invoice.");
             ConsoleUtil.pause(sc);
             return;
         }
 
-        Wallet wallet = walletDao.getWalletByUserId(businessUser.getUserId());
-        if (wallet == null) {
-            walletDao.createWalletForUser(businessUser.getUserId());
+        Wallet wallet;
+        try {
             wallet = walletDao.getWalletByUserId(businessUser.getUserId());
+            if (wallet == null) {
+                walletDao.createWalletForUser(businessUser.getUserId());
+                wallet = walletDao.getWalletByUserId(businessUser.getUserId());
+            }
+        } catch (Exception e) {
+            logger.error("Wallet access failed while marking invoice paid (invoiceId={}, businessUserId={})",
+                    inv.getInvoiceId(), businessUser.getUserId(), e);
+            System.out.println("Wallet not available.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        if (wallet == null) {
+            logger.error("Wallet is still null after creation attempt (businessUserId={})", businessUser.getUserId());
+            System.out.println("Wallet not available.");
+            ConsoleUtil.pause(sc);
+            return;
         }
 
         double newBalance = wallet.getBalance() + inv.getTotalAmount();
-        walletDao.updateBalance(businessUser.getUserId(), newBalance);
 
-     
-        transactionDao.createTransaction(
-                0L,
-                businessUser.getUserId(),
-                inv.getTotalAmount(),
-                "INVOICE_PAYMENT",
-                "SUCCESS",
-                "Invoice #" + inv.getInvoiceId() + " paid"
-        );
+        try {
+            walletDao.updateBalance(businessUser.getUserId(), newBalance);
+        } catch (Exception e) {
+            logger.error("Failed to update wallet balance (businessUserId={}, newBalance={})",
+                    businessUser.getUserId(), fmt(newBalance), e);
+            System.out.println("Failed to credit wallet.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
 
-        invoiceDao.updateStatus(inv.getInvoiceId(), "PAID");
+        try {
+            transactionDao.createTransaction(
+                    0L,
+                    businessUser.getUserId(),
+                    inv.getTotalAmount(),
+                    "INVOICE_PAYMENT",
+                    "SUCCESS",
+                    "Invoice #" + inv.getInvoiceId() + " paid"
+            );
+        } catch (Exception e) {
+            logger.error("Failed to create transaction for invoice payment (invoiceId={}, businessUserId={})",
+                    inv.getInvoiceId(), businessUser.getUserId(), e);
+            System.out.println("Payment recorded failed.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
 
-        notificationService.notifyUser(
-                businessUser.getUserId(),
-                "INVOICE",
-                "Invoice Paid",
-                "Invoice #" + inv.getInvoiceId() + " PAID. Amount ₹" + String.format("%.2f", inv.getTotalAmount())
-        );
+        try {
+            invoiceDao.updateStatus(inv.getInvoiceId(), "PAID");
+        } catch (Exception e) {
+            logger.error("Failed to update invoice status to PAID (invoiceId={}, businessUserId={})",
+                    inv.getInvoiceId(), businessUser.getUserId(), e);
+            System.out.println("Failed to mark invoice PAID.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
 
-        System.out.println("[INFO] Invoice marked PAID. Wallet credited.");
+        try {
+            notificationService.notifyUser(
+                    businessUser.getUserId(),
+                    "INVOICE",
+                    "Invoice Paid",
+                    "Invoice #" + inv.getInvoiceId() + " PAID. Amount ₹" + String.format("%.2f", inv.getTotalAmount())
+            );
+        } catch (Exception e) {
+            logger.error("Failed to send paid notification (invoiceId={}, businessUserId={})",
+                    inv.getInvoiceId(), businessUser.getUserId(), e);
+        }
+
+        logger.info("Invoice marked PAID and wallet credited (invoiceId={}, businessUserId={}, amount={}, newBalance={})",
+                inv.getInvoiceId(), businessUser.getUserId(), fmt(inv.getTotalAmount()), fmt(newBalance));
+
+        System.out.println("Invoice marked PAID. Wallet credited.");
         System.out.printf("New Wallet Balance: ₹%.2f%n", newBalance);
         ConsoleUtil.pause(sc);
     }
@@ -284,5 +468,13 @@ public class InvoiceService {
         s = s.trim();
         if (s.length() <= max) return s;
         return s.substring(0, max - 1) + ".";
+    }
+
+    private String fmt(double v) {
+        return String.format("%.2f", v);
+    }
+
+    private String safe(String s) {
+        return (s == null || s.trim().isEmpty()) ? "-" : s.trim();
     }
 }

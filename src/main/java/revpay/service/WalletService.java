@@ -2,6 +2,9 @@ package revpay.service;
 
 import java.util.Scanner;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import revpay.dao.TransactionDao;
 import revpay.dao.WalletDao;
 import revpay.dao.impl.TransactionDaoImpl;
@@ -12,16 +15,37 @@ import revpay.util.ConsoleUtil;
 
 public class WalletService {
 
+    private static final Logger logger = LoggerFactory.getLogger(WalletService.class);
+
     private final WalletDao walletDao = new WalletDaoImpl();
     private final TransactionDao txDao = new TransactionDaoImpl();
 
-   
     public void addMoneyFromCard(Scanner sc, User user) {
         ConsoleUtil.printHeader("Wallet - Add Money (from Card)");
 
-        Wallet w = walletDao.getWalletByUserId(user.getUserId());
+        if (user == null) {
+            logger.warn("addMoneyFromCard called with null user");
+            System.out.println("[ERROR] Invalid user.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        long userId = user.getUserId();
+        logger.info("Wallet topup started (userId={}, username='{}')", userId, safe(user.getUsername()));
+
+        Wallet w;
+        try {
+            w = walletDao.getWalletByUserId(userId);
+        } catch (Exception e) {
+            logger.error("Failed to load wallet (userId={})", userId, e);
+            System.out.println("Wallet not found.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
         if (w == null) {
-            System.out.println("[ERROR] Wallet not found.");
+            logger.warn("Wallet not found (userId={})", userId);
+            System.out.println("Wallet not found.");
             ConsoleUtil.pause(sc);
             return;
         }
@@ -31,7 +55,8 @@ public class WalletService {
         double amount = readAmount(sc);
 
         if (amount <= 0) {
-            System.out.println("[ERROR] Amount must be greater than 0.");
+            logger.warn("Topup failed: invalid amount (userId={}, amount={})", userId, fmt(amount));
+            System.out.println("Amount must be greater than 0.");
             ConsoleUtil.pause(sc);
             return;
         }
@@ -39,13 +64,13 @@ public class WalletService {
         double newBalance = w.getBalance() + amount;
 
         try {
-         
-            walletDao.updateBalance(user.getUserId(), newBalance);
+            walletDao.updateBalance(userId, newBalance);
+            logger.info("Wallet balance updated for topup (userId={}, amount={}, newBalance={})",
+                    userId, fmt(amount), fmt(newBalance));
 
-         
             boolean saved = txDao.createTransaction(
-                    user.getUserId(),
-                    user.getUserId(),
+                    userId,
+                    userId,
                     amount,
                     "DEPOSIT",
                     "SUCCESS",
@@ -53,26 +78,49 @@ public class WalletService {
             );
 
             if (!saved) {
-                System.out.println("[WARN] Wallet updated but transaction history not saved.");
+                logger.warn("Topup saved wallet but transaction history not saved (userId={}, amount={})",
+                        userId, fmt(amount));
+                System.out.println("Wallet updated but transaction history not saved.");
+            } else {
+                logger.debug("Topup transaction saved (userId={}, amount={})", userId, fmt(amount));
             }
 
-            System.out.println("[INFO] Topup successful. New Balance: " + newBalance);
+            System.out.println("Topup successful. New Balance: " + newBalance);
 
         } catch (Exception e) {
-            System.out.println("[ERROR] Failed to topup wallet.");
-            System.out.println("[DEV] " + e.getMessage());
+            logger.error("Topup failed due to exception (userId={}, amount={})", userId, fmt(amount), e);
+            System.out.println("Failed to topup wallet.");
         }
 
         ConsoleUtil.pause(sc);
     }
 
-    
     public void withdrawToBank(Scanner sc, User user) {
         ConsoleUtil.printHeader("Wallet - Withdraw (to Bank)");
 
-        Wallet w = walletDao.getWalletByUserId(user.getUserId());
+        if (user == null) {
+            logger.warn("withdrawToBank called with null user");
+            System.out.println("Invalid user.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        long userId = user.getUserId();
+        logger.info("Wallet withdraw started (userId={}, username='{}')", userId, safe(user.getUsername()));
+
+        Wallet w;
+        try {
+            w = walletDao.getWalletByUserId(userId);
+        } catch (Exception e) {
+            logger.error("Failed to load wallet (userId={})", userId, e);
+            System.out.println("Wallet not found.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
         if (w == null) {
-            System.out.println("[ERROR] Wallet not found.");
+            logger.warn("Wallet not found (userId={})", userId);
+            System.out.println(" Wallet not found.");
             ConsoleUtil.pause(sc);
             return;
         }
@@ -82,13 +130,16 @@ public class WalletService {
         double amount = readAmount(sc);
 
         if (amount <= 0) {
-            System.out.println("[ERROR] Amount must be greater than 0.");
+            logger.warn("Withdraw failed: invalid amount (userId={}, amount={})", userId, fmt(amount));
+            System.out.println("Amount must be greater than 0.");
             ConsoleUtil.pause(sc);
             return;
         }
 
         if (amount > w.getBalance()) {
-            System.out.println("[ERROR] Insufficient balance.");
+            logger.warn("Withdraw failed: insufficient balance (userId={}, balance={}, amount={})",
+                    userId, fmt(w.getBalance()), fmt(amount));
+            System.out.println("Insufficient balance.");
             ConsoleUtil.pause(sc);
             return;
         }
@@ -96,13 +147,13 @@ public class WalletService {
         double newBalance = w.getBalance() - amount;
 
         try {
-           
-            walletDao.updateBalance(user.getUserId(), newBalance);
+            walletDao.updateBalance(userId, newBalance);
+            logger.info("Wallet balance updated for withdraw (userId={}, amount={}, newBalance={})",
+                    userId, fmt(amount), fmt(newBalance));
 
-          
             boolean saved = txDao.createTransaction(
-                    user.getUserId(),
-                    user.getUserId(),
+                    userId,
+                    userId,
                     amount,
                     "WITHDRAW",
                     "SUCCESS",
@@ -110,20 +161,23 @@ public class WalletService {
             );
 
             if (!saved) {
-                System.out.println("[WARN] Wallet updated but transaction history not saved.");
+                logger.warn("Withdraw saved wallet but transaction history not saved (userId={}, amount={})",
+                        userId, fmt(amount));
+                System.out.println("Wallet updated but transaction history not saved.");
+            } else {
+                logger.debug("Withdraw transaction saved (userId={}, amount={})", userId, fmt(amount));
             }
 
-            System.out.println("[INFO] Withdrawal successful (simulated). New Balance: " + newBalance);
+            System.out.println("Withdrawal successful (simulated). New Balance: " + newBalance);
 
         } catch (Exception e) {
-            System.out.println("[ERROR] Withdrawal failed.");
-            System.out.println("[DEV] " + e.getMessage());
+            logger.error("Withdrawal failed due to exception (userId={}, amount={})", userId, fmt(amount), e);
+            System.out.println("Withdrawal failed.");
         }
 
         ConsoleUtil.pause(sc);
     }
 
-    
     private double readAmount(Scanner sc) {
         try {
             String s = sc.nextLine();
@@ -131,5 +185,13 @@ public class WalletService {
         } catch (Exception e) {
             return -1;
         }
+    }
+
+    private String fmt(double v) {
+        return String.format("%.2f", v);
+    }
+
+    private String safe(String s) {
+        return (s == null || s.trim().isEmpty()) ? "-" : s.trim();
     }
 }

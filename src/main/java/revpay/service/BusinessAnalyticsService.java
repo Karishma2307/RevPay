@@ -1,3 +1,4 @@
+
 package revpay.service;
 
 import java.util.ArrayList;
@@ -5,6 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import revpay.dao.InvoiceDao;
 import revpay.dao.LoanDao;
@@ -20,6 +24,8 @@ import revpay.util.ConsoleUtil;
 
 public class BusinessAnalyticsService {
 
+    private static final Logger logger = LoggerFactory.getLogger(BusinessAnalyticsService.class);
+
     private final TransactionDao transactionDao = new TransactionDaoImpl();
     private final InvoiceDao invoiceDao = new InvoiceDaoImpl();
     private final LoanDao loanDao = new LoanDaoImpl();
@@ -27,15 +33,41 @@ public class BusinessAnalyticsService {
     public void showAnalytics(Scanner sc, User businessUser) {
         ConsoleUtil.printHeader("Business Analytics");
 
+        if (businessUser == null) {
+            logger.warn("Business analytics failed: businessUser is null");
+            System.out.println("Invalid user.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
         long userId = businessUser.getUserId();
+        logger.info("Business analytics started (userId={}, username='{}')",
+                userId, safe(businessUser.getUsername()));
 
-        List<Transaction> txns = transactionDao.searchTransactions(
-                userId, null, null,
-                null, null, null, null, null
-        );
+        List<Transaction> txns;
+        List<Invoice> invoices;
+        List<Loan> loans;
 
-        List<Invoice> invoices = invoiceDao.findByBusinessUser(userId);
-        List<Loan> loans = loanDao.findByBusinessUser(userId);
+        try {
+            txns = transactionDao.searchTransactions(
+                    userId, null, null,
+                    null, null, null, null, null
+            );
+            invoices = invoiceDao.findByBusinessUser(userId);
+            loans = loanDao.findByBusinessUser(userId);
+        } catch (Exception e) {
+            logger.error("Business analytics failed: DAO error while fetching data (userId={})", userId, e);
+            System.out.println("Unable to load analytics right now. Please try again later.");
+            ConsoleUtil.pause(sc);
+            return;
+        }
+
+        if (txns == null) txns = new ArrayList<>();
+        if (invoices == null) invoices = new ArrayList<>();
+        if (loans == null) loans = new ArrayList<>();
+
+        logger.debug("Analytics data fetched (userId={}): txns={}, invoices={}, loans={}",
+                userId, txns.size(), invoices.size(), loans.size());
 
         double totalInflow = 0.0;
         double totalOutflow = 0.0;
@@ -49,6 +81,8 @@ public class BusinessAnalyticsService {
         double transfersOut = 0.0;
 
         for (Transaction t : txns) {
+            if (t == null) continue;
+
             long fromId = t.getFromUserId();
             long toId = t.getToUserId();
             double amount = t.getAmount();
@@ -64,7 +98,6 @@ public class BusinessAnalyticsService {
             else if ("LOAN_DISBURSEMENT".equals(type) && isIn) loanDisbursementIn += amount;
             else if ("LOAN_REPAYMENT".equals(type) && isOut) loanRepaymentOut += amount;
 
-            
             else if ("DEPOSIT".equals(type) && isIn) walletTopupIn += amount;
             else if ("WITHDRAW".equals(type) && isOut) walletWithdrawOut += amount;
 
@@ -84,6 +117,8 @@ public class BusinessAnalyticsService {
         Map<String, Double> customerTotals = new HashMap<>();
 
         for (Invoice inv : invoices) {
+            if (inv == null) continue;
+
             String status = (inv.getStatus() == null) ? "" : inv.getStatus().toUpperCase();
             double amt = inv.getTotalAmount();
 
@@ -112,6 +147,8 @@ public class BusinessAnalyticsService {
         double totalOutstanding = 0.0;
 
         for (Loan l : loans) {
+            if (l == null) continue;
+
             String status = (l.getStatus() == null) ? "" : l.getStatus().toUpperCase();
             totalLoanRequested += l.getAmount();
             totalOutstanding += l.getOutstandingAmount();
@@ -122,6 +159,15 @@ public class BusinessAnalyticsService {
             else if ("REJECTED".equals(status)) loansRejected++;
         }
 
+        
+        logger.info("Analytics summary (userId={}): inflow={}, outflow={}, invoices(total={}, paid={}, pending={}, cancelled={}), loans(total={}, pending={}, active={}, closed={}, rejected={}), outstanding={}",
+                userId,
+                fmt(totalInflow), fmt(totalOutflow),
+                totalInvoices, paidCount, pendingCount, cancelledCount,
+                loansTotal, loansPending, loansActive, loansClosed, loansRejected,
+                fmt(totalOutstanding));
+
+      
         System.out.println("== Transaction Summary ==");
         System.out.printf("Total Inflow  : ₹%.2f%n", totalInflow);
         System.out.printf("Total Outflow : ₹%.2f%n", totalOutflow);
@@ -168,6 +214,7 @@ public class BusinessAnalyticsService {
         System.out.printf("Requested Total : ₹%.2f%n", totalLoanRequested);
         System.out.printf("Outstanding     : ₹%.2f%n", totalOutstanding);
 
+        logger.info("Business analytics displayed successfully (userId={})", userId);
         ConsoleUtil.pause(sc);
     }
 
@@ -179,5 +226,9 @@ public class BusinessAnalyticsService {
 
     private String fmt(double v) {
         return String.format("%.2f", v);
+    }
+
+    private String safe(String s) {
+        return (s == null || s.trim().isEmpty()) ? "-" : s.trim();
     }
 }

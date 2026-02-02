@@ -39,7 +39,7 @@ class AuthServiceTest {
     // ---------------------------------------------------------
     @Test
     void register_invalidChoice_shouldReturnNull() throws Exception {
-        Scanner sc = new Scanner("9\n\n"); // invalid choice + pause enter
+        Scanner sc = new Scanner("9\n\n");
         AuthService service = new AuthService(sc);
 
         inject(service, "userDao", userDao);
@@ -60,10 +60,10 @@ class AuthServiceTest {
     @Test
     void register_usernameTaken_shouldReturnNull() throws Exception {
         String input =
-                "1\n" +                 // Personal
-                "Karishma Shaik\n" +     // full name
-                "karishma\n" +           // username
-                "\n";                    // pause
+                "1\n" +                 
+                "Karishma Shaik\n" +     
+                "karishma\n" +           
+                "\n";                    
 
         Scanner sc = new Scanner(input);
         AuthService service = new AuthService(sc);
@@ -88,15 +88,15 @@ class AuthServiceTest {
     @Test
     void register_successPersonal_shouldCreateUserWalletAndSecurityQ() throws Exception {
         String input =
-                "1\n" +                 // Personal
-                "Karishma Shaik\n" +     // full name
-                "karishma\n" +           // username
-                "k@revpay.com\n" +        // email
-                "9876543210\n" +          // phone
-                "Abcd@1234\n" +           // password
-                "Abcd@1234\n" +           // confirm
-                "1234\n" +                // txn pin
-                "\n";                     // final pause enter
+                "1\n" +                 
+                "Karishma Shaik\n" +     
+                "karishma\n" +           
+                "k@revpay.com\n" +        
+                "9876543210\n" +         
+                "Abcd@1234\n" +           
+                "Abcd@1234\n" +           
+                "1234\n" +                
+                "\n";                    
 
         Scanner sc = new Scanner(input);
         AuthService service = new AuthService(sc);

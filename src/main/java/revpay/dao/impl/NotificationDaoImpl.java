@@ -29,8 +29,8 @@ public class NotificationDaoImpl implements NotificationDao {
             ps.executeUpdate();
 
         } catch (Exception e) {
-            System.out.println("[ERROR] Failed to create notification.");
-            System.out.println("[DEV] " + e.getMessage());
+            System.out.println("Failed to create notification.");
+            System.out.println("[NOTHING] " + e.getMessage());
         }
     }
 
@@ -65,8 +65,8 @@ public class NotificationDaoImpl implements NotificationDao {
             }
 
         } catch (Exception e) {
-            System.out.println("[ERROR] Failed to fetch notifications.");
-            System.out.println("[DEV] " + e.getMessage());
+            System.out.println("Failed to fetch notifications.");
+            System.out.println("[NOTHING] " + e.getMessage());
         }
 
         return list;
@@ -83,8 +83,8 @@ public class NotificationDaoImpl implements NotificationDao {
             ps.executeUpdate();
 
         } catch (Exception e) {
-            System.out.println("[ERROR] Failed to mark all notifications as read.");
-            System.out.println("[DEV] " + e.getMessage());
+            System.out.println("Failed to mark all notifications as read.");
+            System.out.println("[NOTHING] " + e.getMessage());
         }
     }
 }

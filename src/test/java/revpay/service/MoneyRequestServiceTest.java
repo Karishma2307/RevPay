@@ -25,7 +25,7 @@ class MoneyRequestServiceTest {
 
     private MoneyRequestService service;
 
-    // Mocks
+   
     private MoneyRequestDao moneyRequestDao;
     private UserDao userDao;
     private WalletDao walletDao;
@@ -51,7 +51,7 @@ class MoneyRequestServiceTest {
         notificationService = mock(NotificationService.class);
         lowBalanceAlertService = mock(LowBalanceAlertService.class);
 
-        // inject mocks
+        
         inject(service, "moneyRequestDao", moneyRequestDao);
         inject(service, "userDao", userDao);
         inject(service, "walletDao", walletDao);
@@ -138,9 +138,7 @@ class MoneyRequestServiceTest {
         verifyNoInteractions(notificationService);
     }
 
-    // ------------------------------------------------
-    // Reflection helper
-    // ------------------------------------------------
+    
     private void inject(Object target, String field, Object mock) throws Exception {
         Field f = target.getClass().getDeclaredField(field);
         f.setAccessible(true);

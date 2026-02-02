@@ -15,7 +15,7 @@ public class DBConnection {
         try {
             Class.forName("oracle.jdbc.driver.OracleDriver");
         } catch (ClassNotFoundException e) {
-            System.out.println("[ERROR] Oracle JDBC Driver not found.");
+            System.out.println("Oracle JDBC Driver not found.");
             e.printStackTrace();
         }
     }

@@ -43,3 +43,63 @@
 2026-01-31 17:05:47,839 INFO  revpay.service.AuthService - Registration flow started
 2026-01-31 17:05:47,839 WARN  revpay.service.AuthService - Registration failed: invalid account type choice='9'
 2026-01-31 17:05:47,848 INFO  revpay.service.AuthService - Forgot password flow started
+2026-01-31 18:41:01,126 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 18:41:01,146 WARN  revpay.service.AuthService - Registration failed: username already taken username='karishma'
+2026-01-31 18:41:01,214 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 18:41:01,440 INFO  revpay.service.AuthService - Wallet created for new userId=101
+2026-01-31 18:41:01,447 INFO  revpay.service.AuthService - Security questions setup completed (userId=101)
+2026-01-31 18:41:01,447 INFO  revpay.service.AuthService - PERSONAL account created successfully (userId=101, username='karishma', accountId='P-161439')
+2026-01-31 18:41:01,557 INFO  revpay.service.AuthService - Login flow started
+2026-01-31 18:41:01,674 WARN  revpay.service.AuthService - Account locked due to failed login attempts (userId=50, username='karishma', attempts=3)
+2026-01-31 18:41:01,681 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 18:41:01,681 WARN  revpay.service.AuthService - Registration failed: invalid account type choice='9'
+2026-01-31 18:41:01,687 INFO  revpay.service.AuthService - Forgot password flow started
+2026-01-31 19:45:20,679 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 19:45:20,721 WARN  revpay.service.AuthService - Registration failed: username already taken username='karishma'
+2026-01-31 19:45:20,864 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 19:45:21,150 INFO  revpay.service.AuthService - Wallet created for new userId=101
+2026-01-31 19:45:21,157 INFO  revpay.service.AuthService - Security questions setup completed (userId=101)
+2026-01-31 19:45:21,157 INFO  revpay.service.AuthService - PERSONAL account created successfully (userId=101, username='karishma', accountId='P-1021149')
+2026-01-31 19:45:21,282 INFO  revpay.service.AuthService - Login flow started
+2026-01-31 19:45:21,379 WARN  revpay.service.AuthService - Account locked due to failed login attempts (userId=50, username='karishma', attempts=3)
+2026-01-31 19:45:21,386 INFO  revpay.service.AuthService - Registration flow started
+2026-01-31 19:45:21,387 WARN  revpay.service.AuthService - Registration failed: invalid account type choice='9'
+2026-01-31 19:45:21,395 INFO  revpay.service.AuthService - Forgot password flow started
+2026-01-31 19:45:41,355 INFO  revpay.service.LoanService - Loan repayment started (businessUserId=10, username='-')
+2026-01-31 19:45:41,389 WARN  revpay.service.LoanService - Loan repayment failed: insufficient balance (businessUserId=10, balance=1000.00, pay=3000.00)
+2026-01-31 19:45:41,633 INFO  revpay.service.LoanService - Loan repayment started (businessUserId=10, username='-')
+2026-01-31 19:45:41,661 INFO  revpay.service.LoanService - Loan repayment successful (loanId=3, businessUserId=10, pay=2000.00, newWalletBal=4000.00, newOutstanding=3000.00, loanStatus=ACTIVE)
+2026-01-31 19:45:41,684 INFO  revpay.service.LoanService - Loan repayment started (businessUserId=10, username='-')
+2026-01-31 19:45:41,687 INFO  revpay.service.LoanService - Loan repayment successful (loanId=2, businessUserId=10, pay=2000.00, newWalletBal=1000.00, newOutstanding=0.00, loanStatus=CLOSED)
+2026-01-31 19:45:41,703 INFO  revpay.service.LoanService - No loans found (businessUserId=10)
+2026-01-31 19:45:41,715 INFO  revpay.service.LoanService - Loan application started (businessUserId=10, username='-')
+2026-01-31 19:45:41,716 INFO  revpay.service.LoanService - Loan created (loanId=101, businessUserId=10, amount=5000.00, status=PENDING)
+2026-01-31 19:46:00,882 INFO  revpay.service.MoneyRequestService - Cancel outgoing request flow started (userId=1, username='-')
+2026-01-31 19:46:01,186 INFO  revpay.service.MoneyRequestService - Create money request started (requesterId=1, username='-')
+2026-01-31 19:46:01,186 WARN  revpay.service.MoneyRequestService - Create request failed: invalid payer lookup choice='9' (requesterId=1)
+2026-01-31 19:46:01,309 INFO  revpay.service.MoneyRequestService - Decline request flow started (payerId=2, username='-')
+2026-01-31 19:46:01,423 INFO  revpay.service.MoneyRequestService - Create money request started (requesterId=1, username='-')
+2026-01-31 19:46:01,425 WARN  revpay.service.MoneyRequestService - Create request failed: payer not found (requesterId=1, choice='1')
+2026-01-31 19:46:01,556 INFO  revpay.service.MoneyRequestService - Accept request flow started (payerId=2, username='-')
+2026-01-31 19:46:16,701 INFO  revpay.service.NotificationService - Notifications menu opened (userId=10)
+2026-01-31 19:46:16,715 INFO  revpay.service.NotificationService - Notifications menu closed (userId=10)
+2026-01-31 19:46:16,912 INFO  revpay.service.NotificationService - Notifications menu opened (userId=10)
+2026-01-31 19:46:17,034 INFO  revpay.service.NotificationService - Marked all notifications as read (userId=10)
+2026-01-31 19:46:17,034 INFO  revpay.service.NotificationService - Notifications menu closed (userId=10)
+2026-01-31 19:46:17,138 INFO  revpay.service.NotificationService - Notifications menu opened (userId=10)
+2026-01-31 19:46:17,145 INFO  revpay.service.NotificationService - Notifications menu closed (userId=10)
+2026-01-31 19:46:17,153 INFO  revpay.service.NotificationService - Notify user requested (userId=10, type='TRANSACTION', title='Title')
+2026-01-31 19:46:17,216 INFO  revpay.service.NotificationService - Notifications menu opened (userId=10)
+2026-01-31 19:46:17,218 INFO  revpay.service.NotificationService - No notifications found (userId=10, unreadOnly=true)
+2026-01-31 19:46:17,220 INFO  revpay.service.NotificationService - Notifications menu closed (userId=10)
+2026-02-02 09:30:44,639 INFO  revpay.service.AuthService - Registration flow started
+2026-02-02 09:30:44,678 WARN  revpay.service.AuthService - Registration failed: username already taken username='karishma'
+2026-02-02 09:30:44,788 INFO  revpay.service.AuthService - Registration flow started
+2026-02-02 09:30:45,058 INFO  revpay.service.AuthService - Wallet created for new userId=101
+2026-02-02 09:30:45,070 INFO  revpay.service.AuthService - Security questions setup completed (userId=101)
+2026-02-02 09:30:45,073 INFO  revpay.service.AuthService - PERSONAL account created successfully (userId=101, username='karishma', accountId='P-945056')
+2026-02-02 09:30:45,192 INFO  revpay.service.AuthService - Login flow started
+2026-02-02 09:30:45,291 WARN  revpay.service.AuthService - Account locked due to failed login attempts (userId=50, username='karishma', attempts=3)
+2026-02-02 09:30:45,301 INFO  revpay.service.AuthService - Registration flow started
+2026-02-02 09:30:45,301 WARN  revpay.service.AuthService - Registration failed: invalid account type choice='9'
+2026-02-02 09:30:45,309 INFO  revpay.service.AuthService - Forgot password flow started

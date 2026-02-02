@@ -39,7 +39,7 @@ public class PersonalMenu {
 
             if (session.isExpired()) {
                 ConsoleUtil.printHeader("Session Timeout");
-                System.out.println("[INFO] You were logged out due to inactivity.");
+                System.out.println("You were logged out due to inactivity.");
                 ConsoleUtil.pause(sc);
                 return;
             }

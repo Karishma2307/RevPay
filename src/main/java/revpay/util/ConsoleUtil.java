@@ -27,12 +27,12 @@ public class ConsoleUtil {
             try {
                 int val = Integer.parseInt(input.trim());
                 if (val < min || val > max) {
-                    System.out.println("[ERROR] Enter a number between " + min + " and " + max + ".");
+                    System.out.println("Enter a number between " + min + " and " + max + ".");
                     continue;
                 }
                 return val;
             } catch (Exception e) {
-                System.out.println("[ERROR] Invalid number. Try again.");
+                System.out.println("Invalid number. Try again.");
             }
         }
     }
@@ -49,7 +49,7 @@ public class ConsoleUtil {
             try {
                 return LocalDate.parse(input.trim(), fmt);
             } catch (DateTimeParseException e) {
-                System.out.println("[ERROR] Invalid date. Use yyyy-MM-dd or blank.");
+                System.out.println("Invalid date. Use yyyy-MM-dd or blank.");
             }
         }
     }

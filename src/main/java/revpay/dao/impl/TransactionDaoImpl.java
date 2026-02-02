@@ -42,8 +42,8 @@ public class TransactionDaoImpl implements TransactionDao {
             return true;
 
         } catch (SQLException e) {
-            System.out.println("[ERROR] Transaction save failed.");
-            System.out.println("[DEV] " + e.getMessage());
+            System.out.println("Transaction save failed.");
+            System.out.println("[NOTHING] " + e.getMessage());
             return false;
         }
     }
@@ -136,8 +136,8 @@ public class TransactionDaoImpl implements TransactionDao {
             }
 
         } catch (SQLException e) {
-            System.out.println("[ERROR] Failed to search transactions.");
-            System.out.println("[DEV] " + e.getMessage());
+            System.out.println("Failed to search transactions.");
+            System.out.println("[NOTHING] " + e.getMessage());
         }
 
         return list;

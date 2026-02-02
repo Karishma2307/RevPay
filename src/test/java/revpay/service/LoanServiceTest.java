@@ -34,8 +34,7 @@ class LoanServiceTest {
 
     private User businessUser;
 
-    // ✅ IMPORTANT: your ConsoleUtil.pause(sc) consumes nextLine()
-    // So give the Scanner plenty of "\n"
+    
     private String manyEnters() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 50; i++) sb.append("\n");
@@ -74,9 +73,9 @@ class LoanServiceTest {
         when(loanDao.createLoan(any(Loan.class))).thenReturn(101L);
 
         String input =
-                "5000\n" +                 // loan amount
-                "Business expansion\n" +    // purpose
-                manyEnters();               // ✅ for ConsoleUtil.pause(sc)
+                "5000\n" +                 
+                "Business expansion\n" +    
+                manyEnters();               
 
         service.applyForLoan(new Scanner(input), businessUser);
 
@@ -124,9 +123,9 @@ class LoanServiceTest {
         when(walletDao.getWalletByUserId(10L)).thenReturn(wallet);
 
         String input =
-                "1\n" +      // loan id
-                "3000\n" +   // repayment amount
-                manyEnters(); // ✅ for pause()
+                "1\n" +      
+                "3000\n" +   
+                manyEnters(); 
 
         service.makeRepayment(new Scanner(input), businessUser);
 
@@ -154,10 +153,9 @@ class LoanServiceTest {
         when(walletDao.getWalletByUserId(10L)).thenReturn(wallet);
 
         String input =
-                "2\n" +      // loan id
-                "2000\n" +   // repayment amount
-                manyEnters(); // ✅ for pause()
-
+                "2\n" +      
+                "2000\n" +   
+                manyEnters(); 
         service.makeRepayment(new Scanner(input), businessUser);
 
         verify(walletDao).updateBalance(10L, 1000.0);
@@ -192,9 +190,9 @@ class LoanServiceTest {
         when(walletDao.getWalletByUserId(10L)).thenReturn(wallet);
 
         String input =
-                "3\n" +      // loan id
-                "2000\n" +   // repayment amount
-                manyEnters(); // ✅ for pause()
+                "3\n" +      
+                "2000\n" +   
+                manyEnters(); 
 
         service.makeRepayment(new Scanner(input), businessUser);
 

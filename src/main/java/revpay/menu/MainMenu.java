@@ -18,7 +18,7 @@ public class MainMenu {
         AuthService authService = new AuthService(sc);
 
         while (true) {
-            ConsoleUtil.printHeader("Welcome to RevPay");
+            ConsoleUtil.printHeader("☺️Welcome to RevPay☺️");
             System.out.println("1. Register");
             System.out.println("2. Login");
             System.out.println("3. Forgot Password");
@@ -45,11 +45,11 @@ public class MainMenu {
                 authService.forgotPassword();
 
             } else if ("4".equals(choice)) {
-                System.out.println("Goodbye!");
+                System.out.println("❤️❤️Bye!!!Have a nice day❤️❤️");
                 break;
 
             } else {
-                System.out.println("[ERROR] Invalid choice.");
+                System.out.println("Invalid choice....😑");
                 ConsoleUtil.pause(sc);
             }
         }

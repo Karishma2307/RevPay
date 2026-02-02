@@ -30,7 +30,7 @@ public class MoneyRequestDaoImpl implements MoneyRequestDao {
 
             ps.executeUpdate();
 
-            // Get generated REQUEST_ID (Oracle safe way)
+          
             try (PreparedStatement ps2 = con.prepareStatement(
                     "SELECT SEQ_MONEY_REQUESTS.CURRVAL FROM DUAL");
                  ResultSet rs = ps2.executeQuery()) {

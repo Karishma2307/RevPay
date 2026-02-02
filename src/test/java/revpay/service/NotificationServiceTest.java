@@ -30,8 +30,7 @@ class NotificationServiceTest {
         service = new NotificationService();
         notificationDao = mock(NotificationDao.class);
 
-        // ✅ Inject mock into the service regardless of field name
-        // Try "notificationDao" first, else try "dao"
+       
         boolean injected = tryInject(service, "notificationDao", notificationDao)
                         || tryInject(service, "dao", notificationDao);
 
@@ -74,7 +73,7 @@ class NotificationServiceTest {
     // ---------------------------------------------------
     @Test
     void showNotificationsMenu_markAllAsRead_shouldCallDao() {
-        // 3 = mark all as read, then pause enter, then 4 = back
+        
         String input = "3\n\n4\n";
         service.showNotificationsMenu(new Scanner(input), 10L);
 
@@ -91,18 +90,18 @@ class NotificationServiceTest {
         n1.setType("TYPE1");
         n1.setMessage("M1");
 
-        // ✅ if your model supports setRead
+        
         try {
             n1.getClass().getMethod("setRead", boolean.class).invoke(n1, false);
         } catch (Exception ignore) {
-            // if your model doesn't have setRead, it's fine for this test
+            
         }
 
         n1.setCreatedAt(new Timestamp(System.currentTimeMillis()));
 
         when(notificationDao.findByUserId(10L, false)).thenReturn(Arrays.asList(n1));
 
-        // 1 = all, pause enter, 4 = back
+        
         String input = "1\n\n4\n";
         service.showNotificationsMenu(new Scanner(input), 10L);
 
@@ -116,16 +115,14 @@ class NotificationServiceTest {
     void showNotificationsMenu_unreadOnly_empty_shouldQueryDao() {
         when(notificationDao.findByUserId(10L, true)).thenReturn(Collections.emptyList());
 
-        // 2 = unread, pause enter, 4 = back
+        
         String input = "2\n\n4\n";
         service.showNotificationsMenu(new Scanner(input), 10L);
 
         verify(notificationDao, times(1)).findByUserId(10L, true);
     }
 
-    // ---------------------------------------------------
-    // Helper: try injection without throwing
-    // ---------------------------------------------------
+    
     private boolean tryInject(Object target, String fieldName, Object value) {
         try {
             Field f = target.getClass().getDeclaredField(fieldName);
